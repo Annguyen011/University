@@ -1,0 +1,38 @@
+C51 COMPILER V9.01   MAIN                                                                  04/03/2026 08:11:47 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <reg51.h>
+   2          
+   3          sbit P2_7 = P2^7; // Khai báo chân P2.7
+   4          
+   5          void main() {
+   6   1          TMOD = 0x20;  // Timer 1, Mode 2 (8-bit auto-reload)
+   7   1          TH1 = 0x38;   // Giá tr? n?p l?i t? d?ng cho n?a chu k? (200us)
+   8   1          TR1 = 1;      // Kh?i d?ng Timer 1
+   9   1          
+  10   1          while(1) {
+  11   2              while (TF1 == 0); // Ch? c? tràn
+  12   2              TF1 = 0;          // Xóa c? tràn
+  13   2              P2_7 = ~P2_7;     // Ð?o tr?ng thái chân P2.7
+  14   2          }
+  15   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     17    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

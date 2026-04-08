@@ -1,0 +1,50 @@
+C51 COMPILER V9.01   MAIN                                                                  04/03/2026 08:54:08 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <reg51.h>
+   2          
+   3          // M?ng ch?a mã Hex d? hi?n th? các s? t? 0 d?n 9 trên LED 7 do?n Anot chung (Common Anode)
+   4          unsigned char code seg7[] = {0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0x80, 0x90};
+   5          unsigned char count = 0; // Bi?n d?m s?n ph?m
+   6          
+   7          // Hàm ph?c v? Ng?t ngoài 0 (N?i v?i nút nh?n)
+   8          void EX0_ISR() interrupt 0 {
+   9   1          count++; // Tang bi?n d?m
+  10   1          if (count > 9) {
+  11   2              count = 0; // N?u l?n hon 9 thì reset v? 0
+  12   2          }
+  13   1          P2 = seg7[count]; // C?p nh?t s? m?i ra Port 2
+  14   1      }
+  15          
+  16          void main() {
+  17   1          P2 = seg7[0]; // Kh?i t?o hi?n th? s? 0 ban d?u
+  18   1          
+  19   1          // Thi?t l?p ng?t ngoài 0
+  20   1          IT0 = 1;      // C?u hình ng?t kích ho?t b?ng su?n âm (Edge-triggered)
+  21   1          EX0 = 1;      // Cho phép ng?t ngoài 0
+  22   1          EA = 1;       // Cho phép ng?t toàn c?c
+  23   1          
+  24   1          while(1) {
+  25   2              // Vi di?u khi?n n?m ch?, khi nào b?m nút thì nh?y vào hàm ng?t EX0_ISR
+  26   2          }
+  27   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     52    ----
+   CONSTANT SIZE    =     10    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

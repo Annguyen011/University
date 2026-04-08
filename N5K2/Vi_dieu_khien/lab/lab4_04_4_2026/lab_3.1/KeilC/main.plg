@@ -1,0 +1,20 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+D:\University_file\University\N5K2\Vi_dieu_khien\lab\lab4_04_4_2026\lab_3.1\KeilC\main.uvproj
+Project File Date:  <unknown>
+
+<h2>Output:</h2>
+Build target 'Target 1'
+assembling STARTUP.A51...
+compiling main.c...
+linking...
+Program Size: data=9.0 xdata=0 code=41
+"main" - 0 Error(s), 0 Warning(s).
+Build target 'Target 1'
+linking...
+Program Size: data=9.0 xdata=0 code=41
+creating hex file from "main"...
+"main" - 0 Error(s), 0 Warning(s).
