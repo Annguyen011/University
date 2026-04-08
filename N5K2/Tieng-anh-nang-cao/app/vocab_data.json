@@ -3,22 +3,38 @@
         "attend": {
             "sentence": "Secretaries attend to correspondence.",
             "pos": "Động từ",
-            "last_studied": "2026-04-08 23:23",
-            "study_count": 0,
+            "last_studied": "2026-04-08 23:38",
+            "study_count": 1,
             "custom_sentence": ""
         },
         "smile": {
             "sentence": "He always puts a smile on my face.",
             "pos": "Danh từ | Động từ",
-            "last_studied": "2026-04-08 23:22",
-            "study_count": 1,
+            "last_studied": "2026-04-08 23:39",
+            "study_count": 2,
             "custom_sentence": ""
         },
         "accommodate": {
             "sentence": "to accommodate ourselves to circumstances",
             "pos": "Tính từ | Động từ",
-            "last_studied": "2026-04-08 23:23",
-            "study_count": 1,
+            "last_studied": "2026-04-08 23:39",
+            "study_count": 2,
+            "custom_sentence": ""
+        },
+        "blue": {
+            "sentence": "The boys in blue marched to the pipers.",
+            "pos": "Động từ | Tính từ | Danh từ",
+            "vn_meaning": "màu xanh da trời",
+            "last_studied": "2026-04-08 23:39",
+            "study_count": 2,
+            "custom_sentence": ""
+        },
+        "hello": {
+            "sentence": "Hello, everyone.",
+            "pos": "Động từ | Thán từ | Danh từ",
+            "vn_meaning": "Xin chào",
+            "last_studied": "2026-04-08 23:39",
+            "study_count": 2,
             "custom_sentence": ""
         }
     },
@@ -35,7 +51,24 @@
             "helo",
             "attend",
             "smile",
-            "accommodate"
+            "accommodate",
+            "blue",
+            "hello"
+        ],
+        "accommodate": [
+            "2026-04-08"
+        ],
+        "attend": [
+            "2026-04-08"
+        ],
+        "smile": [
+            "2026-04-08"
+        ],
+        "hello": [
+            "2026-04-08"
+        ],
+        "blue": [
+            "2026-04-08"
         ]
     }
 }
