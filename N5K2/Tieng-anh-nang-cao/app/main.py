@@ -20,7 +20,7 @@ import hashlib
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_NAME = os.path.join(BASE_DIR, "vocab_data.json")
 TEMP_AUDIO = os.path.join(BASE_DIR, "voice.mp3")
-CACHE_DIR = os.path.join(BASE_DIR, "image_cache")  # Thư mục cache ảnh
+CACHE_DIR = os.path.join(BASE_DIR, "image_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 spell = SpellChecker()
@@ -49,6 +49,7 @@ FONT_POS = ("Segoe UI", 18, "italic")
 FONT_H2 = ("Segoe UI", 18, "bold")
 FONT_BODY = ("Segoe UI", 15)
 FONT_ITALIC = ("Segoe UI", 16, "italic")
+FONT_SMALL = ("Segoe UI", 12)
 
 POS_MAP = {
     "noun": "Danh từ", "verb": "Động từ", "adjective": "Tính từ",
@@ -113,22 +114,19 @@ def play_sound_system(text):
     threading.Thread(target=task, daemon=True).start()
 
 def get_cached_image_path(word):
-    """Tạo đường dẫn file ảnh cache dựa trên tên từ (an toàn với ký tự đặc biệt)"""
     safe_name = hashlib.md5(word.encode()).hexdigest()
     return os.path.join(CACHE_DIR, f"{safe_name}.jpg")
 
 def download_and_cache_image(word):
-    """Tải ảnh từ pollinations.ai và lưu vào cache"""
     cache_path = get_cached_image_path(word)
     if os.path.exists(cache_path):
-        return cache_path  # Đã có cache
+        return cache_path
     
     try:
         url = f"https://image.pollinations.ai/prompt/a minimalist illustration of '{word}' isolated on white background?width=400&height=400&nologo=true"
         res = requests.get(url, timeout=8)
         if res.status_code == 200:
             img = Image.open(BytesIO(res.content))
-            # Lưu dưới dạng JPEG để nhẹ
             img = img.convert("RGB")
             img.save(cache_path, "JPEG", quality=85)
             return cache_path
@@ -137,13 +135,11 @@ def download_and_cache_image(word):
     return None
 
 def load_image(word, label_widget):
-    """Load ảnh từ cache hoặc tải mới, sau đó hiển thị lên label"""
     def task():
         cache_path = download_and_cache_image(word)
         if cache_path and os.path.exists(cache_path):
             try:
                 pil_img = Image.open(cache_path)
-                # Giới hạn kích thước để tránh lag
                 pil_img.thumbnail((400, 400))
                 ctk_img = ctk.CTkImage(pil_img, size=(180, 180))
                 app.after(0, lambda: label_widget.configure(image=ctk_img, text=""))
@@ -169,7 +165,19 @@ def refresh_list():
 
         icon = "⚠" if is_old else "✦"
         vn_text = info.get('vn_meaning', '')
-        display_text = f" {icon}  {word.capitalize()} - {vn_text.capitalize()}" if vn_text else f" {icon}  {word.capitalize()}"
+        study_count = info.get('study_count', 0)
+        # Hiển thị số lần học đẹp mắt
+        if study_count >= 10:
+            count_icon = "🏆"
+        elif study_count >= 5:
+            count_icon = "🔥"
+        elif study_count > 0:
+            count_icon = "📖"
+        else:
+            count_icon = "✨"
+        count_display = f"{count_icon}{study_count}" if study_count > 0 else "✨0"
+        
+        display_text = f" {icon}  {word.capitalize()} - {vn_text.capitalize()}  [{count_display}]" if vn_text else f" {icon}  {word.capitalize()}  [{count_display}]"
         
         btn = ctk.CTkButton(scroll_list, text=display_text, 
                             anchor="w", fg_color="transparent", text_color=("black", "white"),
@@ -178,7 +186,6 @@ def refresh_list():
         btn.pack(fill="x", pady=2, padx=5)
 
 def edit_vn_meaning():
-    """Cho phép người dùng sửa trực tiếp nghĩa tiếng Việt"""
     if not current_word:
         return
     current_vn = vocab_data[current_word].get('vn_meaning', '')
@@ -186,9 +193,8 @@ def edit_vn_meaning():
     if new_vn and new_vn.strip():
         vocab_data[current_word]['vn_meaning'] = new_vn.strip()
         save_data(data_json)
-        # Cập nhật giao diện
         lbl_vn.configure(text=new_vn.strip().capitalize())
-        refresh_list()  # Cập nhật danh sách bên sidebar
+        refresh_list()
 
 def select_word(word):
     global current_word
@@ -216,7 +222,6 @@ def select_word(word):
     stats_text = f"🔥 Số lần học: {data['study_count']}   •   🕒 Lần cuối: {data['last_studied']}"
     lbl_stats.configure(text=stats_text)
     
-    # Cảnh báo
     lbl_alert.pack_forget()
     try:
         diff_days = (datetime.now() - datetime.strptime(data['last_studied'], "%Y-%m-%d %H:%M")).days
@@ -250,13 +255,13 @@ def add_word():
     select_word(word)
 
 def delete_word():
+    global current_word
     if current_word and messagebox.askyesno("Xác nhận", f"Xóa '{current_word}'?"):
         del vocab_data[current_word]
         save_data(data_json)
         detail_container.pack_forget()
         frame_welcome.pack(expand=True)
         refresh_list()
-        global current_word
         current_word = None
 
 # ==========================================
@@ -282,7 +287,6 @@ class MiniGameWindow(ctk.CTkToplevel):
         if len(all_words) == 0:
             return
         
-        # Hàm tính độ ưu tiên: Số lần học (thấp) -> Số ngày xa (cao)
         def priority(w):
             count = vocab_data[w].get('study_count', 0)
             date_str = vocab_data[w].get('last_studied', '')
@@ -364,7 +368,7 @@ def open_game_setup():
         messagebox.showwarning("Thiếu dữ liệu", "Bạn cần thêm ít nhất 4 từ vựng để có thể chơi game!")
         return
     
-    max_words = min(len(vocab_data), 50)  # Giới hạn tối đa 50 từ để game chạy mượt
+    max_words = min(len(vocab_data), 50)
     num = simpledialog.askinteger("Cài đặt Game", f"Bạn muốn ôn bao nhiêu từ hôm nay? (Tối đa {max_words})", minvalue=1, maxvalue=max_words)
     if num:
         MiniGameWindow(app, num)
@@ -424,7 +428,6 @@ header_left.pack(side="left", padx=(0, 15))
 lbl_title = ctk.CTkLabel(header_left, text="word", font=FONT_TITLE)
 lbl_title.pack(anchor="w")
 
-# Dòng nghĩa + nút sửa
 vn_frame = ctk.CTkFrame(header_left, fg_color="transparent")
 vn_frame.pack(anchor="w", pady=(0, 5))
 lbl_vn = ctk.CTkLabel(vn_frame, text="nghĩa tiếng việt", font=FONT_VN, text_color=COLOR_SUCCESS[0])
@@ -434,7 +437,6 @@ edit_btn = ctk.CTkButton(vn_frame, text="✏️", width=30, height=30, corner_ra
                          command=edit_vn_meaning)
 edit_btn.pack(side="left", padx=(10, 0))
 
-# Khung từ loại (POS)
 pos_frame = ctk.CTkFrame(c1, corner_radius=20, fg_color=COLOR_ACCENT)
 pos_frame.pack(side="left", pady=(10,0))
 lbl_pos_text = ctk.CTkLabel(pos_frame, text="pos", font=("Segoe UI", 14), text_color="white", width=80, height=30)
