@@ -1,0 +1,41 @@
+{
+    "vocab_data": {
+        "attend": {
+            "sentence": "Secretaries attend to correspondence.",
+            "pos": "Động từ",
+            "last_studied": "2026-04-08 23:23",
+            "study_count": 0,
+            "custom_sentence": ""
+        },
+        "smile": {
+            "sentence": "He always puts a smile on my face.",
+            "pos": "Danh từ | Động từ",
+            "last_studied": "2026-04-08 23:22",
+            "study_count": 1,
+            "custom_sentence": ""
+        },
+        "accommodate": {
+            "sentence": "to accommodate ourselves to circumstances",
+            "pos": "Tính từ | Động từ",
+            "last_studied": "2026-04-08 23:23",
+            "study_count": 1,
+            "custom_sentence": ""
+        }
+    },
+    "daily_study_tracker": {
+        "2026-04-08": [
+            "attend",
+            "he",
+            "helo"
+        ]
+    },
+    "daily_tracker": {
+        "2026-04-08": [
+            "he",
+            "helo",
+            "attend",
+            "smile",
+            "accommodate"
+        ]
+    }
+}
