@@ -1,42 +1,37 @@
 ﻿import customtkinter as ctk
-from tkinter import messagebox, simpledialog
-import json
+from tkinter import messagebox
+import sqlite3
 import os
 from datetime import datetime
 import requests
 from io import BytesIO
 from PIL import Image
 import threading
-from spellchecker import SpellChecker
 import pygame
 from gtts import gTTS
 from deep_translator import GoogleTranslator
 import random
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
+import time
 
-# ==========================================
-# 0. ĐƯỜNG DẪN FILE & KHỞI TẠO
-# ==========================================
+# ================== CẤU HÌNH & KHỞI TẠO ==================
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FILE_NAME = os.path.join(BASE_DIR, "vocab_data.json")
-TEMP_AUDIO = os.path.join(BASE_DIR, "voice.mp3")
+DB_PATH = os.path.join(BASE_DIR, "vocab.db")
 CACHE_DIR = os.path.join(BASE_DIR, "image_cache")
 AUDIO_CACHE_DIR = os.path.join(BASE_DIR, "audio_cache")
-
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
 
-spell = SpellChecker()
 pygame.mixer.init()
 translator = GoogleTranslator(source='en', target='vi')
 
-ui_row_refs = {'vocab': {}, 'phrase': {}}
-
-# ==========================================
-# 1. CẤU HÌNH GIAO DIỆN
-# ==========================================
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
+executor = ThreadPoolExecutor(max_workers=15)
+DB_LOCK = threading.Lock()
 
 BG_SIDEBAR = ("#F7F9FC", "#1E1E24")
 BG_MAIN = ("#FFFFFF", "#141419")
@@ -45,11 +40,8 @@ COLOR_ACCENT = "#5E5CE6"
 COLOR_SUCCESS = ("#34C759", "#30D158")
 COLOR_DANGER = ("#FF3B30", "#FF453A")
 TEXT_SUB = ("#6E6E73", "#98989F")
-
-FONT_LOGO = ("Segoe UI", 24, "bold")
 FONT_TITLE = ("Segoe UI", 42, "bold")
 FONT_VN = ("Segoe UI", 22, "bold")
-FONT_H2 = ("Segoe UI", 16, "bold")
 FONT_BODY = ("Segoe UI", 14)
 FONT_ITALIC = ("Segoe UI", 15, "italic")
 
@@ -59,44 +51,159 @@ POS_MAP = {
     "conjunction": "Liên từ", "interjection": "Thán từ"
 }
 
-# ==========================================
-# 2. XỬ LÝ DỮ LIỆU & API
-# ==========================================
-def load_data():
-    if os.path.exists(FILE_NAME):
-        with open(FILE_NAME, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if "vocab_data" not in data: data["vocab_data"] = {}
-            if "phrase_data" not in data: data["phrase_data"] = {}
-            if "daily_tracker" not in data: data["daily_tracker"] = {}
-            return data
-    return {"vocab_data": {}, "phrase_data": {}, "daily_tracker": {}}
+# ================== RAM-FIRST DATA MANAGER (SIÊU TỐC) ==================
+class DataManager:
+    def __init__(self):
+        self.vocab = {}
+        self.phrase = {}
+        self.tracker = {} # {date: set(words)}
+        self._init_db()
+        self._load_to_ram()
 
-def save_data(data):
-    with open(FILE_NAME, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    def _init_db(self):
+        with DB_LOCK:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS vocab
+                         (word TEXT PRIMARY KEY, sentence TEXT, pos TEXT, vn_meaning TEXT,
+                          last_studied TEXT, study_count INTEGER DEFAULT 0, custom_sentence TEXT, item_type TEXT DEFAULT 'vocab')''')
+            c.execute('''CREATE TABLE IF NOT EXISTS phrase
+                         (word TEXT PRIMARY KEY, sentence TEXT, pos TEXT, vn_meaning TEXT,
+                          last_studied TEXT, study_count INTEGER DEFAULT 0, custom_sentence TEXT, item_type TEXT DEFAULT 'phrase')''')
+            c.execute('''CREATE TABLE IF NOT EXISTS daily_tracker
+                         (date TEXT, word TEXT, PRIMARY KEY (date, word))''')
+            conn.commit()
+            conn.close()
 
-data_json = load_data()
-vocab_data = data_json["vocab_data"]
-phrase_data = data_json["phrase_data"]
-daily_tracker = data_json["daily_tracker"]
+    def _load_to_ram(self):
+        with DB_LOCK:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            for row in c.execute("SELECT * FROM vocab"):
+                self.vocab[row[0]] = {'sentence': row[1], 'pos': row[2], 'vn_meaning': row[3], 'last_studied': row[4], 'study_count': row[5], 'custom_sentence': row[6], 'item_type': row[7]}
+            for row in c.execute("SELECT * FROM phrase"):
+                self.phrase[row[0]] = {'sentence': row[1], 'pos': row[2], 'vn_meaning': row[3], 'last_studied': row[4], 'study_count': row[5], 'custom_sentence': row[6], 'item_type': row[7]}
+            for row in c.execute("SELECT date, word FROM daily_tracker"):
+                if row[0] not in self.tracker: self.tracker[row[0]] = set()
+                self.tracker[row[0]].add(row[1])
+            conn.close()
 
-current_item = None
-current_type = None
+    def get_all(self, item_type):
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        return [(w, v['vn_meaning'], v['study_count'], v['last_studied']) for w, v in d.items()]
 
-def update_study_progress(text, item_type):
-    target_dict = vocab_data if item_type == 'vocab' else phrase_data
-    today = datetime.now().strftime("%Y-%m-%d")
-    if today not in daily_tracker: daily_tracker[today] = []
-    if text not in daily_tracker[today]:
-        target_dict[text]['study_count'] = target_dict[text].get('study_count', 0) + 1
-        daily_tracker[today].append(text)
-    target_dict[text]['last_studied'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    save_data(data_json)
+    def get_detail(self, word, item_type):
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        return d.get(word)
 
+    def update_progress(self, word, item_type):
+        """Xử lý RAM cực nhanh: Tăng số lần học 1 lần/ngày. Cập nhật thời gian thực"""
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        if word not in d: return False
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if today not in self.tracker: self.tracker[today] = set()
+
+        increased = False
+        if word not in self.tracker[today]:
+            d[word]['study_count'] += 1
+            self.tracker[today].add(word)
+            increased = True
+            
+        d[word]['last_studied'] = now_str
+
+        # Chạy đồng bộ Database ngầm (Không làm lag UI)
+        def save_to_db():
+            with DB_LOCK:
+                conn = sqlite3.connect(DB_PATH)
+                if increased:
+                    conn.execute(f"UPDATE {item_type} SET study_count=?, last_studied=? WHERE word=?", (d[word]['study_count'], now_str, word))
+                    conn.execute("INSERT OR IGNORE INTO daily_tracker (date, word) VALUES (?,?)", (today, word))
+                else:
+                    conn.execute(f"UPDATE {item_type} SET last_studied=? WHERE word=?", (now_str, word))
+                conn.commit()
+                conn.close()
+        executor.submit(save_to_db)
+        return increased
+
+    def add_or_update(self, word, item_type, sentence, pos, vn_meaning, custom_sentence="", sync_db=True):
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        if word in d:
+            d[word].update({'sentence': sentence, 'pos': pos, 'vn_meaning': vn_meaning, 'custom_sentence': custom_sentence})
+        else:
+            d[word] = {'sentence': sentence, 'pos': pos, 'vn_meaning': vn_meaning, 'last_studied': "", 'study_count': 0, 'custom_sentence': custom_sentence, 'item_type': item_type}
+        
+        if sync_db:
+            def save_to_db():
+                with DB_LOCK:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    if c.execute(f"SELECT 1 FROM {item_type} WHERE word=?", (word,)).fetchone():
+                        conn.execute(f"UPDATE {item_type} SET sentence=?, pos=?, vn_meaning=?, custom_sentence=? WHERE word=?", (sentence, pos, vn_meaning, custom_sentence, word))
+                    else:
+                        conn.execute(f"INSERT INTO {item_type} (word, sentence, pos, vn_meaning, custom_sentence, last_studied, study_count) VALUES (?,?,?,?,?,?,?)", (word, sentence, pos, vn_meaning, custom_sentence, "", 0))
+                    conn.commit()
+                    conn.close()
+            executor.submit(save_to_db)
+
+    def update_field(self, word, item_type, field, value):
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        if word in d:
+            d[word][field] = value
+            def save_to_db():
+                with DB_LOCK:
+                    conn = sqlite3.connect(DB_PATH)
+                    conn.execute(f"UPDATE {item_type} SET {field}=? WHERE word=?", (value, word))
+                    conn.commit(); conn.close()
+            executor.submit(save_to_db)
+
+    def delete(self, word, item_type):
+        d = self.vocab if item_type == 'vocab' else self.phrase
+        if word in d:
+            del d[word]
+            def save_to_db():
+                with DB_LOCK:
+                    conn = sqlite3.connect(DB_PATH)
+                    conn.execute(f"DELETE FROM {item_type} WHERE word=?", (word,))
+                    conn.commit(); conn.close()
+            executor.submit(save_to_db)
+
+data_manager = DataManager()
+
+# ================== BỘ NHỚ ĐỆM (CACHE) ==================
+class TimedLRUCache:
+    def __init__(self, max_size=200, ttl=86400):
+        self.cache = OrderedDict()
+        self.max_size = max_size
+        self.ttl = ttl
+    
+    def get(self, key):
+        if key in self.cache:
+            value, timestamp = self.cache[key]
+            if time.time() - timestamp < self.ttl:
+                self.cache.move_to_end(key)
+                return value
+            else:
+                del self.cache[key]
+        return None
+    
+    def set(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = (value, time.time())
+        if len(self.cache) > self.max_size:
+            self.cache.popitem(last=False)
+
+image_cache = TimedLRUCache(max_size=150, ttl=3600)
+meaning_cache = TimedLRUCache(max_size=500, ttl=86400)
+
+# ================== API & XỬ LÝ ==================
 def get_word_info(word):
-    example = "Chưa có ví dụ tự động."
-    pos_str = "Chưa phân loại"
+    cached = meaning_cache.get(word)
+    if cached: return cached
+    example, pos_str = "Chưa có ví dụ tự động.", "Chưa phân loại"
     try:
         res = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=3)
         if res.status_code == 200:
@@ -105,17 +212,25 @@ def get_word_info(word):
             pos_str = " | ".join(pos_list)
             for m in d['meanings']:
                 for df in m['definitions']:
-                    if 'example' in df: example = df['example']; break
+                    if 'example' in df:
+                        example = df['example']
+                        break
                 if example != "Chưa có ví dụ tự động.": break
     except: pass
     try: vn_meaning = translator.translate(word)
     except: vn_meaning = "Lỗi dịch"
-    return example, pos_str, vn_meaning
+    result = (example, pos_str, vn_meaning)
+    meaning_cache.set(word, result)
+    return result
 
 def get_phrase_info(phrase):
+    cached = meaning_cache.get(phrase)
+    if cached: return cached
     try: vn_meaning = translator.translate(phrase)
     except: vn_meaning = "Lỗi dịch"
-    return "Hãy tự đặt một câu ví dụ cho cụm từ này.", "Cụm từ / Câu", vn_meaning
+    result = ("Hãy tự đặt một câu ví dụ cho cụm từ này.", "Cụm từ / Câu", vn_meaning)
+    meaning_cache.set(phrase, result)
+    return result
 
 def play_sound_system(text):
     if not text: return
@@ -131,827 +246,262 @@ def play_sound_system(text):
             while pygame.mixer.music.get_busy(): pygame.time.Clock().tick(10)
             pygame.mixer.music.unload()
         except: pass
-    threading.Thread(target=task, daemon=True).start()
+    executor.submit(task)
 
-def get_cached_image_path(text):
-    safe_name = hashlib.md5(text.encode()).hexdigest()
-    return os.path.join(CACHE_DIR, f"{safe_name}.jpg")
-
-def download_and_cache_image(text):
-    cache_path = get_cached_image_path(text)
+def download_and_cache_image(word):
+    cache_path = os.path.join(CACHE_DIR, f"{hashlib.md5(word.encode()).hexdigest()}.jpg")
     if os.path.exists(cache_path): return cache_path
+    img_data = image_cache.get(word)
+    if img_data:
+        with open(cache_path, "wb") as f: f.write(img_data)
+        return cache_path
     try:
-        search_term = text.replace(" ", "+")
-        url = f"https://tse2.mm.bing.net/th?q={search_term}+png+isolated&w=800&h=800&c=7&rs=1"
+        url = f"https://tse2.mm.bing.net/th?q={word.replace(' ', '+')}+png+isolated&w=400&h=400&c=7&rs=1"
         res = requests.get(url, timeout=4)
         if res.status_code == 200:
-            img = Image.open(BytesIO(res.content)).convert("RGB")
-            img.save(cache_path, "JPEG", quality=85)
+            with open(cache_path, "wb") as f: f.write(res.content)
+            image_cache.set(word, res.content)
             return cache_path
     except: pass
     return None
 
-def load_image(text, label_widget):
+def load_image_async(word, label_widget):
     def task():
-        cache_path = download_and_cache_image(text)
+        cache_path = download_and_cache_image(word)
         if cache_path and os.path.exists(cache_path):
             try:
                 pil_img = Image.open(cache_path)
-                pil_img.thumbnail((400, 400))
+                pil_img.thumbnail((200, 200), Image.Resampling.BILINEAR)
                 ctk_img = ctk.CTkImage(pil_img, size=(180, 180))
                 app.after(0, lambda: label_widget.configure(image=ctk_img, text=""))
                 return
             except: pass
-        app.after(0, lambda: label_widget.configure(text="[ Không tải được ảnh ]", image="None"))
-    threading.Thread(target=task, daemon=True).start()
+        app.after(0, lambda: label_widget.configure(text="[ Không tải được ảnh ]", image=""))
+    executor.submit(task)
 
-# ==========================================
-# 3. LOGIC GIAO DIỆN CHÍNH
-# ==========================================
-def render_scroll_list(scroll_widget, data_dict, item_type):
-    for w in scroll_widget.winfo_children(): w.destroy()
-    ui_row_refs[item_type].clear()
-    
-    items = list(data_dict.items())
-    sort_type = sort_var.get()
-    
-    def get_date(item):
-        d = item[1].get("last_studied", "")
-        return d if d else "0000-00-00 00:00"
+# ================== TỐI ƯU VIRTUAL SCROLL LIST ==================
+# ================== TỐI ƯU VIRTUAL SCROLL LIST (60FPS RENDER ENGINE) ==================
+class VirtualScrollList(ctk.CTkFrame):
+    def __init__(self, master, item_type, **kwargs):
+        bg_color = kwargs.pop('bg', BG_SIDEBAR[1])
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self.item_type = item_type
+        self.items = []
+        self.item_height = 56
+        
+        self.canvas = ctk.CTkCanvas(self, highlightthickness=0, bg=bg_color, borderwidth=0)
+        # Tối ưu: Scrollbar giờ điều khiển Canvas trực tiếp, không gọi qua hàm redraw nữa
+        self.scrollbar = ctk.CTkScrollbar(self, command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        
+        self.canvas.bind('<Configure>', self.on_resize)
+        self.bind_scroll(self.canvas)
+        
+        self.total_height = 0
+        self.sort_criteria = "recent"
+        
+        self.pool_size = 50 # Tăng lên 50 để chống viền trắng trên màn hình 2K/4K
+        self.row_pool = []
+        self.init_pool()
+        self.load_data()
+        
+        # KHỞI ĐỘNG VÒNG LẶP RENDER 60 FPS
+        self.last_y = -1
+        self.last_h = -1
+        self.after(16, self.render_loop)
 
-    if "Tên" in sort_type: items.sort(key=lambda x: x[0])
-    elif "Gần nhất" in sort_type: items.sort(key=get_date, reverse=True)
-    elif "Xa nhất" in sort_type: items.sort(key=get_date)
-    elif "Nhiều nhất" in sort_type: items.sort(key=lambda x: x[1].get("study_count", 0), reverse=True)
-    elif "Ít nhất" in sort_type: items.sort(key=lambda x: x[1].get("study_count", 0))
-
-    items = items[:300] 
-
-    header = ctk.CTkFrame(scroll_widget, fg_color="transparent")
-    header.pack(fill="x", pady=(0, 5))
-    header.grid_columnconfigure(1, weight=1) 
-    header.grid_columnconfigure(2, weight=1) 
-    
-    ctk.CTkLabel(header, text="TT", font=("Segoe UI", 12, "bold"), text_color=TEXT_SUB, width=30).grid(row=0, column=0)
-    ctk.CTkLabel(header, text="Nội dung", font=("Segoe UI", 12, "bold"), text_color=TEXT_SUB, anchor="w").grid(row=0, column=1, sticky="w")
-    ctk.CTkLabel(header, text="Nghĩa VN", font=("Segoe UI", 12, "bold"), text_color=TEXT_SUB, anchor="w").grid(row=0, column=2, sticky="w")
-    ctk.CTkLabel(header, text="Ôn", font=("Segoe UI", 12, "bold"), text_color=TEXT_SUB, width=30).grid(row=0, column=3)
-    ctk.CTkLabel(header, text="", width=60).grid(row=0, column=4)
-    
-    for text, info in items:
-        is_old = False
+    # Vòng lặp ngầm: Chỉ vẽ lại khi màn hình thực sự xê dịch
+    def render_loop(self):
         try:
-            diff_days = (datetime.now() - datetime.strptime(info.get('last_studied', "2000-01-01 00:00"), "%Y-%m-%d %H:%M")).days
-            if diff_days >= 3: is_old = True
-        except: pass
+            current_y = self.canvas.canvasy(0)
+            current_h = self.canvas.winfo_height()
+            if current_y != self.last_y or current_h != self.last_h:
+                self.redraw()
+                self.last_y = current_y
+                self.last_h = current_h
+        except:
+            pass
+        self.after(16, self.render_loop)
 
-        icon = "⚠" if is_old else "✦"
-        color_icon = COLOR_DANGER[0] if is_old else COLOR_ACCENT
-        vn_text = info.get('vn_meaning', '')
-        study_count = info.get('study_count', 0)
-        
-        row = ctk.CTkFrame(scroll_widget, fg_color=BG_CARD, corner_radius=8)
-        row.pack(fill="x", pady=2)
-        row.grid_columnconfigure(1, weight=1)
-        row.grid_columnconfigure(2, weight=1)
-        
-        lbl_icon = ctk.CTkLabel(row, text=icon, font=("Segoe UI", 18, "bold"), text_color=color_icon, width=30)
-        lbl_icon.grid(row=0, column=0, pady=8)
-        lbl_w = ctk.CTkLabel(row, text=text.capitalize(), font=("Segoe UI", 14, "bold"), anchor="w", justify="left")
-        lbl_w.grid(row=0, column=1, sticky="we", pady=8, padx=(0,5))
-        lbl_v = ctk.CTkLabel(row, text=vn_text.capitalize(), font=FONT_BODY, text_color=TEXT_SUB, anchor="w", justify="left")
-        lbl_v.grid(row=0, column=2, sticky="we", pady=8, padx=(0,5))
-        lbl_count = ctk.CTkLabel(row, text=str(study_count), font=("Segoe UI", 14, "bold"), text_color=COLOR_SUCCESS[0], width=30)
-        lbl_count.grid(row=0, column=3, pady=8)
-        btn_view = ctk.CTkButton(row, text="Xem", width=50, height=28, font=("Segoe UI", 12, "bold"), fg_color=COLOR_ACCENT, hover_color="#4A48C0", command=lambda t=text, ty=item_type: select_item(t, ty))
-        btn_view.grid(row=0, column=4, padx=5, pady=8)
-        ui_row_refs[item_type][text] = {'icon': lbl_icon, 'count': lbl_count}
+    def bind_scroll(self, widget):
+        widget.bind('<MouseWheel>', self.on_mousewheel)
+        widget.bind('<Button-4>', self.on_mousewheel)
+        widget.bind('<Button-5>', self.on_mousewheel)
 
-def refresh_list(*args):
-    render_scroll_list(scroll_vocab, vocab_data, 'vocab')
-    render_scroll_list(scroll_phrase, phrase_data, 'phrase')
-
-def edit_vn_meaning():
-    if not current_item: return
-    target_dict = vocab_data if current_type == 'vocab' else phrase_data
-    current_vn = target_dict[current_item].get('vn_meaning', '')
-    dialog = ctk.CTkInputDialog(text=f"Sửa nghĩa tiếng Việt của '{current_item}':", title="Sửa nghĩa")
-    new_vn = dialog.get_input()
-    if new_vn and new_vn.strip():
-        target_dict[current_item]['vn_meaning'] = new_vn.strip()
-        save_data(data_json)
-        lbl_vn.configure(text=new_vn.strip().capitalize())
-        refresh_list()
-
-def select_item(text, item_type):
-    global current_item, current_type
-    current_item = text
-    current_type = item_type
-    target_dict = vocab_data if item_type == 'vocab' else phrase_data
-    update_study_progress(text, item_type)
-    data = target_dict[text]
-    
-    if text in ui_row_refs[item_type]:
-        ui_row_refs[item_type][text]['count'].configure(text=str(data['study_count']))
-        ui_row_refs[item_type][text]['icon'].configure(text="✦", text_color=COLOR_ACCENT)
-
-    frame_welcome.pack_forget()
-    detail_container.pack(fill="both", expand=True, padx=40, pady=20)
-    lbl_title.configure(text=text.lower())
-    lbl_vn.configure(text=data.get('vn_meaning', '...').capitalize()) 
-    lbl_pos_text.configure(text=data.get('pos', 'unknown'))
-    lbl_ex.configure(text=f'"{data["sentence"]}"')
-    lbl_stats.configure(text=f"🔥 Số lần: {data['study_count']}  •  🕒 Lần cuối: {data['last_studied']}")
-    
-    lbl_alert.pack_forget()
-    try:
-        if data.get('study_count', 0) >= 10 and (datetime.now() - datetime.strptime(data['last_studied'], "%Y-%m-%d %H:%M")).days >= 3:
-            lbl_alert.configure(text="🚨 Cảnh báo: Từ/Cụm này lâu rồi chưa ôn lại!")
-            lbl_alert.pack(anchor="w", padx=25, pady=(10, 0))
-    except: pass
-    
-    txt_note.delete("1.0", "end")
-    txt_note.insert("1.0", data.get("custom_sentence", ""))
-    lbl_img.configure(image="", text="Đang tìm ảnh...")
-    
-    play_sound_system(text)
-    load_image(text, lbl_img)
-
-def add_item():
-    # Đưa tất cả về chữ thường để loại bỏ lỗi phân biệt hoa thường
-    text = entry_add.get().strip().lower()
-    if not text: return
-    
-    # Quét xem từ đã tồn tại chưa (Im lặng chọn nếu đã có)
-    if text in vocab_data:
-        entry_add.delete(0, 'end')
-        tab_view.set("Từ Đơn")
-        select_item(text, 'vocab')
-        return
-    elif text in phrase_data:
-        entry_add.delete(0, 'end')
-        tab_view.set("Cụm Từ")
-        select_item(text, 'phrase')
-        return
-
-    # Tự động nhận diện từ hay cụm từ
-    is_single_word = len(text.split()) == 1
-    target_type = 'vocab' if is_single_word else 'phrase'
-    target_dict = vocab_data if is_single_word else phrase_data
-
-    # Check chính tả nếu là từ đơn
-    if is_single_word and spell.unknown([text]):
-        corr = spell.correction(text)
-        if corr and corr != text:
-            if messagebox.askyesno("Sai chữ?", f"Ý bạn là '{corr}'?"): 
-                text = corr
-                # Sau khi sửa chính tả, check lại xem có bị trùng không
-                if text in vocab_data:
-                    entry_add.delete(0, 'end')
-                    tab_view.set("Từ Đơn")
-                    select_item(text, 'vocab')
-                    return
-            else: return
-
-    entry_add.delete(0, 'end')
-    entry_add.configure(placeholder_text="⏳ Đang tải dữ liệu...", state="disabled")
-
-    def fetch_api_background():
-        if is_single_word: ex, pos, vn = get_word_info(text)
-        else: ex, pos, vn = get_phrase_info(text)
-            
-        def update_ui_after_fetch():
-            target_dict[text] = {"sentence": ex, "pos": pos, "vn_meaning": vn, "last_studied": "", "study_count": 0, "custom_sentence": ""}
-            save_data(data_json)
-            entry_add.configure(state="normal", placeholder_text="Nhập nhanh 1 từ/cụm từ...")
-            tab_view.set("Từ Đơn" if is_single_word else "Cụm Từ")
-            refresh_list()
-            select_item(text, target_type)
-            
-        app.after(0, update_ui_after_fetch)
-    threading.Thread(target=fetch_api_background, daemon=True).start()
-
-def delete_item():
-    global current_item, current_type
-    if current_item and messagebox.askyesno("Xóa", f"Xóa '{current_item}'?"):
-        if current_type == 'vocab': del vocab_data[current_item]
-        else: del phrase_data[current_item]
-        save_data(data_json)
-        detail_container.pack_forget()
-        frame_welcome.pack(expand=True)
-        refresh_list()
-        current_item, current_type = None, None
-
-# ==========================================
-# CHỨC NĂNG THÊM HÀNG LOẠT VÀ THỐNG KÊ
-# ==========================================
-class BatchAddDialog(ctk.CTkToplevel):
-    def __init__(self, master):
-        super().__init__(master)
-        self.title("Thêm Hàng Loạt")
-        self.geometry("500x450")
-        self.transient(master)
-        self.grab_set()
-
-        ctk.CTkLabel(self, text="📝 THÊM TỪ VỰNG HÀNG LOẠT", font=("Segoe UI", 18, "bold"), text_color=COLOR_ACCENT).pack(pady=(20,5))
-        guide_text = ("Hướng dẫn: Nhập các từ/cụm từ, ngăn cách nhau bằng dấu phẩy (,)\nPhần mềm sẽ tự động phân loại Từ đơn/Cụm từ.\nVí dụ: hello, how are you, make sense, apple")
-        ctk.CTkLabel(self, text=guide_text, text_color=TEXT_SUB, font=("Segoe UI", 13), justify="center").pack(pady=(0,15))
-
-        self.textbox = ctk.CTkTextbox(self, height=200, font=("Segoe UI", 15), corner_radius=10, border_width=1)
-        self.textbox.pack(fill="x", padx=25, pady=10)
-
-        self.lbl_status = ctk.CTkLabel(self, text="Sẵn sàng...", font=("Segoe UI", 14, "italic"), text_color=COLOR_SUCCESS[0])
-        self.lbl_status.pack(pady=5)
-
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(pady=10)
-        ctk.CTkButton(btn_frame, text="Hủy bỏ", width=100, fg_color="transparent", border_width=1, text_color="gray", command=self.destroy).pack(side="left", padx=10)
-        self.btn_start = ctk.CTkButton(btn_frame, text="Bắt đầu", width=140, font=FONT_H2, command=self.start_batch_add)
-        self.btn_start.pack(side="right", padx=10)
-
-    def start_batch_add(self):
-        content = self.textbox.get("1.0", "end").strip()
-        if not content: return
-        
-        # In-place xử lý chữ thường và cắt khoảng trắng
-        raw_words = [w.strip().lower() for w in content.split(",") if w.strip()]
-        # Lọc bỏ từ bị trùng lặp ngay trong danh sách nhập vào
-        words = list(dict.fromkeys(raw_words))
-        
-        if not words: return
-
-        self.btn_start.configure(state="disabled")
-        self.textbox.configure(state="disabled")
-        threading.Thread(target=self.process_words, args=(words,), daemon=True).start()
-
-    def process_words(self, words):
-        added_count = 0
-        for i, w in enumerate(words):
-            app.after(0, lambda idx=i, total=len(words), curr=w: self.lbl_status.configure(text=f"⏳ Đang xử lý ({idx+1}/{total}): '{curr}' ...", text_color=COLOR_ACCENT))
-            
-            # Quét trùng lặp im lặng
-            if w in vocab_data or w in phrase_data: 
-                continue
-            
-            is_single = len(w.split()) == 1
-            target_dict = vocab_data if is_single else phrase_data
-            
-            if is_single: ex, pos, vn = get_word_info(w)
-            else: ex, pos, vn = get_phrase_info(w)
-            
-            target_dict[w] = {"sentence": ex, "pos": pos, "vn_meaning": vn, "last_studied": "", "study_count": 0, "custom_sentence": ""}
-            added_count += 1
-
-        save_data(data_json)
-        app.after(0, refresh_list)
-        app.after(0, lambda: self.finish_processing(added_count, len(words)))
-
-    def finish_processing(self, added, total):
-        if added == 0:
-            self.lbl_status.configure(text=f"Tất cả từ bạn nhập đều đã có sẵn trong danh sách!", text_color="gray")
+    def on_mousewheel(self, event):
+        if event.num == 4:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self.canvas.yview_scroll(1, "units")
         else:
-            self.lbl_status.configure(text=f"✅ Hoàn tất! Đã thêm {added} mục mới.", text_color=COLOR_SUCCESS[0])
-        self.btn_start.configure(text="Đóng cửa sổ", state="normal", command=self.destroy)
+            delta = event.delta
+            units = int(-1*(delta/120)) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+            self.canvas.yview_scroll(units, "units")
+        # KHÔNG gọi self.redraw() ở đây nữa để chống nghẽn CPU
 
-def open_batch_add():
-    BatchAddDialog(app)
+    def init_pool(self):
+        for _ in range(self.pool_size):
+            frame = ctk.CTkFrame(self.canvas, fg_color=BG_CARD, corner_radius=8, height=48)
+            frame.grid_columnconfigure(1, weight=1); frame.grid_columnconfigure(2, weight=1)
+            frame.grid_propagate(False)
+            
+            lbl_icon = ctk.CTkLabel(frame, text="", font=("Segoe UI", 18, "bold"), width=30)
+            lbl_icon.grid(row=0, column=0, pady=8, padx=5)
+            lbl_word = ctk.CTkLabel(frame, text="", font=("Segoe UI", 14, "bold"), anchor="w")
+            lbl_word.grid(row=0, column=1, sticky="we", pady=8, padx=5)
+            lbl_vn = ctk.CTkLabel(frame, text="", font=FONT_BODY, text_color=TEXT_SUB, anchor="w")
+            lbl_vn.grid(row=0, column=2, sticky="we", pady=8, padx=5)
+            lbl_count = ctk.CTkLabel(frame, text="", font=("Segoe UI", 14, "bold"), text_color=COLOR_SUCCESS[0], width=30)
+            lbl_count.grid(row=0, column=3, pady=8, padx=5)
+            btn_view = ctk.CTkButton(frame, text="Xem", width=50, height=28, font=("Segoe UI", 12, "bold"), fg_color=COLOR_ACCENT, hover_color="#4A48C0")
+            btn_view.grid(row=0, column=4, padx=10, pady=8)
+            
+            for w in [frame, lbl_icon, lbl_word, lbl_vn, lbl_count, btn_view]:
+                self.bind_scroll(w)
+            
+            wid = self.canvas.create_window(0, -1000, anchor='nw', window=frame)
+            self.row_pool.append({
+                'frame': frame, 'icon': lbl_icon, 'word': lbl_word, 
+                'vn': lbl_vn, 'count': lbl_count, 'btn': btn_view, 
+                'id': wid, 'data_idx': -1
+            })
 
-class StatisticsWindow(ctk.CTkToplevel):
-    def __init__(self, master):
-        super().__init__(master)
-        self.title("📊 Thống Kê Học Tập")
-        self.geometry("650x550")
-        self.transient(master)
-        self.grab_set()
-
-        t_vocab = len(vocab_data)
-        t_phrase = len(phrase_data)
-        today = datetime.now().strftime("%Y-%m-%d")
-        studied_today = len(daily_tracker.get(today, []))
-
-        mastered, warned, unlearned = 0, 0, 0
-
-        for d in [vocab_data, phrase_data]:
-            for k, v in d.items():
-                c = v.get("study_count", 0)
-                if c == 0: unlearned += 1
-                elif c >= 15: mastered += 1
-
-                if c >= 10:
+    def load_data(self):
+        self.items = data_manager.get_all(self.item_type)
+        self.set_sort(self.sort_criteria) 
+    
+    def set_sort(self, criteria):
+        self.sort_criteria = criteria
+        if criteria == "name": self.items.sort(key=lambda x: x[0])
+        elif criteria == "recent": self.items.sort(key=lambda x: x[3] if x[3] else "0000", reverse=True)
+        elif criteria == "oldest": self.items.sort(key=lambda x: x[3] if x[3] else "0000")
+        elif criteria == "most": self.items.sort(key=lambda x: x[2], reverse=True)
+        elif criteria == "least": self.items.sort(key=lambda x: x[2])
+        self.update_total_height()
+        for row in self.row_pool: row['data_idx'] = -1
+        self.last_y = -1 # Đánh dấu ép render lại
+        
+    def update_total_height(self):
+        self.total_height = max(len(self.items) * self.item_height, self.canvas.winfo_height())
+        self.canvas.configure(scrollregion=(0, 0, self.canvas.winfo_width(), self.total_height))
+    
+    def on_resize(self, event):
+        self.update_total_height()
+        for row in self.row_pool:
+            self.canvas.itemconfig(row['id'], width=event.width)
+        self.last_y = -1 # Ép render lại nếu đổi kích thước
+    
+    def redraw(self):
+        view_top = self.canvas.canvasy(0)
+        first = max(0, int(view_top // self.item_height))
+        last = min(len(self.items), first + self.pool_size)
+        
+        active_pool_indices = set()
+        for data_idx in range(first, last):
+            pool_idx = data_idx % self.pool_size
+            active_pool_indices.add(pool_idx)
+            row = self.row_pool[pool_idx]
+            
+            if row['data_idx'] != data_idx:
+                word, vn_meaning, study_count, last_studied = self.items[data_idx]
+                is_old = False
+                if last_studied:
                     try:
-                        diff = (datetime.now() - datetime.strptime(v.get('last_studied', "2000-01-01 00:00"), "%Y-%m-%d %H:%M")).days
-                        if diff >= 3: warned += 1
+                        if (datetime.now() - datetime.strptime(last_studied, "%Y-%m-%d %H:%M")).days >= 3:
+                            is_old = True
                     except: pass
-
-        ctk.CTkLabel(self, text="📊 TỔNG QUAN HỌC TẬP", font=("Segoe UI", 24, "bold"), text_color=COLOR_ACCENT).pack(pady=(20, 10))
-
-        grid = ctk.CTkFrame(self, fg_color="transparent")
-        grid.pack(fill="both", expand=True, padx=20, pady=10)
-        grid.grid_columnconfigure(0, weight=1)
-        grid.grid_columnconfigure(1, weight=1)
-
-        def make_card(parent, row, col, title, value, color):
-            card = ctk.CTkFrame(parent, corner_radius=15, fg_color=BG_CARD)
-            card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-            ctk.CTkLabel(card, text=title, font=FONT_BODY, text_color=TEXT_SUB).pack(pady=(20, 5))
-            ctk.CTkLabel(card, text=str(value), font=("Segoe UI", 42, "bold"), text_color=color).pack(pady=(0, 20))
-
-        make_card(grid, 0, 0, "📚 Tổng Từ Đơn", t_vocab, COLOR_ACCENT)
-        make_card(grid, 0, 1, "💬 Tổng Cụm Từ", t_phrase, COLOR_ACCENT)
-        make_card(grid, 1, 0, "🔥 Đã học hôm nay", studied_today, COLOR_SUCCESS[0])
-        make_card(grid, 1, 1, "✅ Đã thuộc (>15 lần)", mastered, COLOR_SUCCESS[0])
-        make_card(grid, 2, 0, "🚨 Cảnh báo (Lâu chưa ôn)", warned, COLOR_DANGER[0])
-        make_card(grid, 2, 1, "🆕 Chưa học (0 lần)", unlearned, "gray")
-
-def show_statistics():
-    StatisticsWindow(app)
-
-def backup_data():
-    backup_file = os.path.join(BASE_DIR, f"backup_vocab_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-    try:
-        with open(backup_file, "w", encoding="utf-8") as f:
-            json.dump(data_json, f, ensure_ascii=False, indent=4)
-        messagebox.showinfo("Sao lưu", f"Đã lưu bản sao dữ liệu tại:\n{backup_file}")
-    except Exception as e:
-        messagebox.showerror("Lỗi", f"Không thể sao lưu: {e}")
-
-def change_theme(new_mode: str):
-    ctk.set_appearance_mode(new_mode)
-
-def show_source_code():
-    src_win = ctk.CTkToplevel(app)
-    src_win.title("📄 Mã nguồn")
-    src_win.geometry("900x700")
-    src_win.transient(app)
-    txt = ctk.CTkTextbox(src_win, font=("Consolas", 14), wrap="none", fg_color=BG_MAIN)
-    txt.pack(fill="both", expand=True, padx=20, pady=20)
-    try:
-        with open(__file__, "r", encoding="utf-8") as f: txt.insert("1.0", f.read())
-    except Exception as e: txt.insert("1.0", f"Lỗi: {e}")
-    txt.configure(state="disabled")
-
-# ==========================================
-# 4. GAME ÔN TẬP
-# ==========================================
-def get_game_data(source_type):
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    combined = {}
-    for k, v in vocab_data.items():
-        if source_type == "Chưa ôn hôm nay":
-            last_date = v.get("last_studied", "").split(" ")[0]
-            count = v.get("study_count", 0)
-            if last_date != today_str and count < 15: combined[k] = {**v, "type": "vocab"}
-        else: combined[k] = {**v, "type": "vocab"}
-    for k, v in phrase_data.items():
-        if source_type == "Chưa ôn hôm nay":
-            last_date = v.get("last_studied", "").split(" ")[0]
-            count = v.get("study_count", 0)
-            if last_date != today_str and count < 15: combined[k] = {**v, "type": "phrase"}
-        else: combined[k] = {**v, "type": "phrase"}
-    return combined
-
-class GameSetupDialog(ctk.CTkToplevel):
-    def __init__(self, master):
-        super().__init__(master)
-        self.title("Cài đặt Game")
-        self.geometry("500x500")
-        self.transient(master)
-        self.grab_set()
-        
-        self.result_num, self.result_mode, self.result_data = None, None, None
-        
-        ctk.CTkLabel(self, text="CÀI ĐẶT TRÒ CHƠI", font=("Segoe UI", 20, "bold"), text_color=COLOR_ACCENT).pack(pady=(20, 10))
-        ctk.CTkLabel(self, text="Nguồn từ vựng:", font=FONT_BODY).pack(pady=(10, 0))
-        self.source_mode = ctk.CTkSegmentedButton(self, values=["Ngẫu nhiên", "Chưa ôn hôm nay"], font=FONT_BODY, command=self.update_slider_max)
-        self.source_mode.set("Chưa ôn hôm nay")
-        self.source_mode.pack(pady=10, fill="x", padx=30)
-        
-        self.lbl_empty_alert = ctk.CTkLabel(self, text="", text_color=COLOR_SUCCESS[0], font=FONT_BODY)
-        self.lbl_empty_alert.pack()
-
-        ctk.CTkLabel(self, text="Thể loại Game:", font=FONT_BODY).pack(pady=(10, 0))
-        self.game_mode = ctk.CTkSegmentedButton(self, values=["Trắc nghiệm", "Đảo chữ", "Nối từ", "Nghe & Gõ"], font=FONT_BODY)
-        self.game_mode.set("Trắc nghiệm")
-        self.game_mode.pack(pady=10, fill="x", padx=30)
-
-        self.lbl_slider_title = ctk.CTkLabel(self, text="Số lượng từ:", font=FONT_BODY)
-        self.lbl_slider_title.pack(pady=(15, 0))
-        self.lbl_val = ctk.CTkLabel(self, text="5", font=("Segoe UI", 36, "bold"), text_color=COLOR_SUCCESS[0])
-        self.lbl_val.pack(pady=5)
-        self.slider = ctk.CTkSlider(self, from_=1, to=10, number_of_steps=9, button_color=COLOR_SUCCESS[0], progress_color=COLOR_SUCCESS[0], command=self.update_val)
-        self.slider.pack(fill="x", padx=40, pady=10)
-        
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(pady=(15, 20))
-        ctk.CTkButton(btn_frame, text="Hủy", width=100, fg_color="transparent", border_width=1, text_color="gray", command=self.destroy).pack(side="left", padx=10)
-        self.btn_start = ctk.CTkButton(btn_frame, text="Bắt đầu", width=100, fg_color=COLOR_SUCCESS, hover_color="#28a745", command=self.on_ok)
-        self.btn_start.pack(side="right", padx=10)
-        
-        self.update_slider_max(self.source_mode.get())
-        self.wait_window()
-
-    def update_slider_max(self, mode):
-        data = get_game_data(mode)
-        max_words = min(len(data), 50)
-        if max_words == 0:
-            self.lbl_empty_alert.configure(text="🎉 Bạn đã ôn hết từ vựng hôm nay.")
-            self.slider.configure(state="disabled")
-            self.btn_start.configure(state="disabled")
-            self.lbl_val.configure(text="0")
-        else:
-            self.lbl_empty_alert.configure(text="")
-            self.slider.configure(state="normal", from_=1, to=max_words, number_of_steps=max_words-1 if max_words>1 else 1)
-            self.btn_start.configure(state="normal")
-            default_val = min(5, max_words)
-            self.slider.set(default_val)
-            self.update_val(default_val)
-
-    def update_val(self, val): self.lbl_val.configure(text=str(int(val)))
-
-    def on_ok(self):
-        self.result_num = int(self.slider.get())
-        self.result_mode = self.game_mode.get()
-        self.result_data = get_game_data(self.source_mode.get())
-        self.destroy()
-
-class QuizGameWindow(ctk.CTkToplevel):
-    def __init__(self, master, num_words, game_data):
-        super().__init__(master)
-        self.title("🎮 Game Trắc Nghiệm")
-        self.geometry("600x500")
-        self.transient(master)
-        self.grab_set()
-        self.questions, self.current_idx, self.score = [], 0, 0
-        self.all_data = game_data
-        self.prepare_game(num_words)
-        self.build_ui()
-        self.load_question()
-
-    def prepare_game(self, num_words):
-        all_words = list(self.all_data.keys())
-        def priority(w):
-            c = self.all_data[w].get('study_count', 0)
-            try: d = (datetime.now() - datetime.strptime(self.all_data[w].get('last_studied', ''), "%Y-%m-%d %H:%M")).days
-            except: d = 9999
-            return (c, -d)
-        sorted_w = sorted(all_words, key=priority)[:min(num_words, len(all_words))]
-        for w in sorted_w:
-            options = [w]
-            cands = [x for x in all_words if x != w]
-            random.shuffle(cands)
-            while len(options) < 4 and cands:
-                o = cands.pop()
-                if o not in options: options.append(o)
-            random.shuffle(options)
-            self.questions.append((w, self.all_data[w].get('vn_meaning', ''), options, self.all_data[w]['type']))
-
-    def build_ui(self):
-        self.lbl_progress = ctk.CTkLabel(self, text="Câu 0", font=FONT_BODY, text_color=TEXT_SUB)
-        self.lbl_progress.pack(pady=(20, 5))
-        self.lbl_question = ctk.CTkLabel(self, text="Nghĩa là:", font=("Segoe UI", 28, "bold"), text_color=COLOR_ACCENT, wraplength=500)
-        self.lbl_question.pack(pady=(10, 30))
-        self.btn_opts = []
-        for i in range(4):
-            btn = ctk.CTkButton(self, text="", height=50, corner_radius=10, font=("Segoe UI", 16, "bold"), 
-                                fg_color=BG_CARD, text_color=("black", "white"), hover_color=COLOR_ACCENT,
-                                command=lambda idx=i: self.check_answer(idx))
-            btn.pack(fill="x", padx=40, pady=8)
-            self.btn_opts.append(btn)
-
-    def load_question(self):
-        if self.current_idx >= len(self.questions):
-            messagebox.showinfo("Xong", f"Đúng {self.score}/{len(self.questions)} câu.")
-            self.destroy(); refresh_list(); return
-        q_word, q_vn, q_opts, _ = self.questions[self.current_idx]
-        self.lbl_progress.configure(text=f"Câu {self.current_idx + 1} / {len(self.questions)}")
-        self.lbl_question.configure(text=f"{q_vn.capitalize()}")
-        for i in range(4): self.btn_opts[i].configure(text=q_opts[i].capitalize())
-
-    def check_answer(self, btn_idx):
-        correct_word, _, options, i_type = self.questions[self.current_idx]
-        selected_word = options[btn_idx]
-        if selected_word == correct_word:
-            update_study_progress(correct_word, i_type)
-            self.score += 1
-            play_sound_system(correct_word)
-        else: messagebox.showerror("Sai", f"Đáp án đúng:\n{correct_word.capitalize()}")
-        self.current_idx += 1
-        self.load_question()
-
-class ScrambleGameWindow(ctk.CTkToplevel):
-    def __init__(self, master, num_words, game_data):
-        super().__init__(master)
-        self.title("🎮 Game Đảo Chữ")
-        self.geometry("600x500")
-        self.transient(master)
-        self.grab_set()
-        self.questions, self.current_idx, self.score = [], 0, 0
-        self.all_data = game_data
-        self.prepare_game(num_words)
-        self.build_ui()
-        self.load_question()
-
-    def prepare_game(self, num_words):
-        all_words = list(self.all_data.keys())
-        def priority(w):
-            c = self.all_data[w].get('study_count', 0)
-            try: d = (datetime.now() - datetime.strptime(self.all_data[w].get('last_studied', ''), "%Y-%m-%d %H:%M")).days
-            except: d = 9999
-            return (c, -d)
-        sorted_w = sorted(all_words, key=priority)[:min(num_words, len(all_words))]
-        for w in sorted_w:
-            vn = self.all_data[w].get('vn_meaning', 'Chưa có nghĩa')
-            self.questions.append((w, vn, self.all_data[w]['type']))
-
-    def build_ui(self):
-        self.lbl_progress = ctk.CTkLabel(self, text="Câu 0", font=FONT_BODY, text_color=TEXT_SUB)
-        self.lbl_progress.pack(pady=(20, 5))
-        self.lbl_vn = ctk.CTkLabel(self, text="Nghĩa TV", font=("Segoe UI", 24, "bold"), text_color=COLOR_SUCCESS[0], wraplength=500)
-        self.lbl_vn.pack(pady=10)
-        self.lbl_scrambled = ctk.CTkLabel(self, text="W O R D", font=("Segoe UI", 36, "bold"), text_color=COLOR_ACCENT, wraplength=500)
-        self.lbl_scrambled.pack(pady=(10, 30))
-        self.entry_ans = ctk.CTkEntry(self, font=("Segoe UI", 24, "bold"), justify="center", height=60, corner_radius=15)
-        self.entry_ans.pack(fill="x", padx=60, pady=10)
-        self.entry_ans.bind('<Return>', lambda e: self.check_answer())
-
-        btn_f = ctk.CTkFrame(self, fg_color="transparent")
-        btn_f.pack(pady=20)
-        ctk.CTkButton(btn_f, text="🔊 Nghe gợi ý", width=120, height=45, fg_color=BG_CARD, text_color=("black", "white"), hover_color="gray80", command=self.play_hint).pack(side="left", padx=10)
-        ctk.CTkButton(btn_f, text="Kiểm tra", width=120, height=45, fg_color=COLOR_ACCENT, font=FONT_H2, command=self.check_answer).pack(side="right", padx=10)
-
-    def play_hint(self):
-        correct_word, _, _ = self.questions[self.current_idx]
-        play_sound_system(correct_word)
-
-    def load_question(self):
-        if self.current_idx >= len(self.questions):
-            messagebox.showinfo("Xong", f"Bạn gõ đúng {self.score}/{len(self.questions)} từ.")
-            self.destroy(); refresh_list(); return
+                
+                row['icon'].configure(text="⚠" if is_old else "✦", text_color=COLOR_DANGER[0] if is_old else COLOR_ACCENT)
+                row['word'].configure(text=word.capitalize())
+                row['vn'].configure(text=vn_meaning.capitalize() if vn_meaning else "")
+                row['count'].configure(text=str(study_count))
+                row['btn'].configure(command=lambda w=word, ty=self.item_type: select_item(w, ty))
+                row['data_idx'] = data_idx
             
-        q_word, q_vn, _ = self.questions[self.current_idx]
-        self.lbl_progress.configure(text=f"Câu {self.current_idx + 1} / {len(self.questions)}")
-        self.lbl_vn.configure(text=f"{q_vn.capitalize()}")
-        
-        words_in_phrase = q_word.split()
-        scrambled_words = []
-        for w in words_in_phrase:
-            chars = list(w)
-            random.shuffle(chars)
-            while "".join(chars) == w and len(w) > 2: random.shuffle(chars)
-            scrambled_words.append("".join(chars).upper())
+            self.canvas.coords(row['id'], 0, data_idx * self.item_height)
             
-        self.lbl_scrambled.configure(text="   ".join(scrambled_words))
-        self.entry_ans.delete(0, "end")
-        self.entry_ans.focus()
-
-    def check_answer(self):
-        correct_word, _, i_type = self.questions[self.current_idx]
-        ans = self.entry_ans.get().strip().lower()
-        if ans == correct_word:
-            update_study_progress(correct_word, i_type)
-            self.score += 1
-            play_sound_system(correct_word)
-        else: messagebox.showerror("Sai", f"Chính tả đúng phải là:\n{correct_word.upper()}")
-        self.current_idx += 1
-        self.load_question()
-
-class MatchGameWindow(ctk.CTkToplevel):
-    def __init__(self, master, num_words, game_data):
-        super().__init__(master)
-        self.title("🎮 Game Nối Từ")
-        self.geometry("800x600")
-        self.transient(master)
-        self.grab_set()
-        self.pairs, self.score, self.total_pairs = [], 0, num_words
-        self.selected_en, self.selected_vi = None, None
-        self.all_data = game_data
-        self.prepare_game(num_words)
-        self.build_ui()
-
-    def prepare_game(self, num_words):
-        all_words = list(self.all_data.keys())
-        def priority(w):
-            c = self.all_data[w].get('study_count', 0)
-            try: d = (datetime.now() - datetime.strptime(self.all_data[w].get('last_studied', ''), "%Y-%m-%d %H:%M")).days
-            except: d = 9999
-            return (c, -d)
-        sorted_w = sorted(all_words, key=priority)[:min(num_words, len(all_words))]
-        for w in sorted_w:
-            vn = self.all_data[w].get('vn_meaning', 'Chưa có nghĩa')
-            self.pairs.append({"en": w, "vi": vn, "type": self.all_data[w]['type']})
-
-    def build_ui(self):
-        ctk.CTkLabel(self, text="Ghép từ tiếng Anh với nghĩa tiếng Việt", font=FONT_H2).pack(pady=20)
-        self.game_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.game_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        self.game_frame.grid_columnconfigure(0, weight=1)
-        self.game_frame.grid_columnconfigure(1, weight=1)
-        
-        en_list = [p for p in self.pairs]
-        vi_list = [p for p in self.pairs]
-        random.shuffle(en_list)
-        random.shuffle(vi_list)
-        
-        self.btn_en_dict, self.btn_vi_dict = {}, {}
-        
-        frame_en = ctk.CTkFrame(self.game_frame, fg_color="transparent")
-        frame_en.grid(row=0, column=0, sticky="nsew", padx=10)
-        for item in en_list:
-            w = item["en"]
-            btn = ctk.CTkButton(frame_en, text=w.capitalize(), height=50, corner_radius=10, 
-                                font=("Segoe UI", 14, "bold"), fg_color=BG_CARD, text_color=("black", "white"),
-                                command=lambda x=w: self.on_select_en(x))
-            btn.pack(fill="x", pady=8)
-            self.btn_en_dict[w] = btn
-            
-        frame_vi = ctk.CTkFrame(self.game_frame, fg_color="transparent")
-        frame_vi.grid(row=0, column=1, sticky="nsew", padx=10)
-        for item in vi_list:
-            v = item["vi"]
-            btn = ctk.CTkButton(frame_vi, text=v.capitalize(), height=50, corner_radius=10, 
-                                font=("Segoe UI", 14), fg_color=BG_CARD, text_color=("black", "white"),
-                                command=lambda x=v: self.on_select_vi(x))
-            btn.pack(fill="x", pady=8)
-            self.btn_vi_dict[v] = btn
-
-    def on_select_en(self, word):
-        for w, btn in self.btn_en_dict.items():
-            if btn.winfo_exists(): btn.configure(border_width=0)
-        self.selected_en = word
-        if self.btn_en_dict[word].winfo_exists(): self.btn_en_dict[word].configure(border_width=2, border_color=COLOR_ACCENT)
-        self.check_match()
-
-    def on_select_vi(self, word):
-        for w, btn in self.btn_vi_dict.items():
-            if btn.winfo_exists(): btn.configure(border_width=0)
-        self.selected_vi = word
-        if self.btn_vi_dict[word].winfo_exists(): self.btn_vi_dict[word].configure(border_width=2, border_color=COLOR_SUCCESS[0])
-        self.check_match()
-
-    def check_match(self):
-        if self.selected_en and self.selected_vi:
-            match_item = next((p for p in self.pairs if p["en"] == self.selected_en and p["vi"] == self.selected_vi), None)
-            if match_item:
-                play_sound_system(self.selected_en)
-                update_study_progress(self.selected_en, match_item["type"])
-                if self.btn_en_dict[self.selected_en].winfo_exists(): self.btn_en_dict[self.selected_en].destroy()
-                if self.btn_vi_dict[self.selected_vi].winfo_exists(): self.btn_vi_dict[self.selected_vi].destroy()
-                self.score += 1
-                self.selected_en, self.selected_vi = None, None
-                if self.score == self.total_pairs:
-                    messagebox.showinfo("Tuyệt vời", "Bạn đã nối đúng tất cả các từ!")
-                    self.destroy(); refresh_list()
-            else:
-                messagebox.showerror("Sai rồi", "Hai mục này không khớp nhau!")
-                for w, btn in self.btn_en_dict.items():
-                    if btn.winfo_exists(): btn.configure(border_width=0)
-                for w, btn in self.btn_vi_dict.items():
-                    if btn.winfo_exists(): btn.configure(border_width=0)
-                self.selected_en, self.selected_vi = None, None
-
-class DictationGameWindow(ctk.CTkToplevel):
-    def __init__(self, master, num_words, game_data):
-        super().__init__(master)
-        self.title("🎮 Game Nghe & Gõ")
-        self.geometry("600x500")
-        self.transient(master)
-        self.grab_set()
-        self.questions, self.current_idx, self.score = [], 0, 0
-        self.all_data = game_data
-        self.prepare_game(num_words)
-        self.build_ui()
-        self.load_question()
-
-    def prepare_game(self, num_words):
-        all_words = list(self.all_data.keys())
-        def priority(w):
-            c = self.all_data[w].get('study_count', 0)
-            try: d = (datetime.now() - datetime.strptime(self.all_data[w].get('last_studied', ''), "%Y-%m-%d %H:%M")).days
-            except: d = 9999
-            return (c, -d)
-        sorted_w = sorted(all_words, key=priority)[:min(num_words, len(all_words))]
-        for w in sorted_w:
-            vn = self.all_data[w].get('vn_meaning', 'Chưa có nghĩa')
-            self.questions.append((w, vn, self.all_data[w]['type']))
-
-    def build_ui(self):
-        self.lbl_progress = ctk.CTkLabel(self, text="Câu 0", font=FONT_BODY, text_color=TEXT_SUB)
-        self.lbl_progress.pack(pady=(20, 5))
-        self.btn_audio = ctk.CTkButton(self, text="🔊 NGHE TỪ VỰNG", font=("Segoe UI", 24, "bold"), height=80, corner_radius=15, command=self.play_audio)
-        self.btn_audio.pack(pady=20)
-        self.lbl_hint = ctk.CTkLabel(self, text="---", font=("Segoe UI", 18, "italic"), text_color=COLOR_SUCCESS[0], wraplength=500)
-        self.lbl_hint.pack(pady=10)
-        self.entry_ans = ctk.CTkEntry(self, font=("Segoe UI", 24, "bold"), justify="center", height=60, corner_radius=15)
-        self.entry_ans.pack(fill="x", padx=60, pady=10)
-        self.entry_ans.bind('<Return>', lambda e: self.check_answer())
-
-        btn_f = ctk.CTkFrame(self, fg_color="transparent")
-        btn_f.pack(pady=20)
-        ctk.CTkButton(btn_f, text="💡 Gợi ý nghĩa", width=120, height=45, fg_color=BG_CARD, text_color=("black", "white"), hover_color="gray80", command=self.show_hint).pack(side="left", padx=10)
-        ctk.CTkButton(btn_f, text="Kiểm tra", width=120, height=45, fg_color=COLOR_ACCENT, font=FONT_H2, command=self.check_answer).pack(side="right", padx=10)
-
-    def play_audio(self):
-        q_word, _, _ = self.questions[self.current_idx]
-        play_sound_system(q_word)
-
-    def show_hint(self):
-        _, q_vn, _ = self.questions[self.current_idx]
-        self.lbl_hint.configure(text=f"Nghĩa: {q_vn.capitalize()}")
-
-    def load_question(self):
-        if self.current_idx >= len(self.questions):
-            messagebox.showinfo("Xong", f"Bạn nghe gõ đúng {self.score}/{len(self.questions)} mục.")
-            self.destroy(); refresh_list(); return
-            
-        self.lbl_progress.configure(text=f"Câu {self.current_idx + 1} / {len(self.questions)}")
-        self.lbl_hint.configure(text="---")
-        self.entry_ans.delete(0, "end")
-        self.entry_ans.focus()
-        self.play_audio()
-
-    def check_answer(self):
-        correct_word, _, i_type = self.questions[self.current_idx]
-        ans = self.entry_ans.get().strip().lower()
-        if ans == correct_word:
-            update_study_progress(correct_word, i_type)
-            self.score += 1
-            play_sound_system(correct_word) 
-        else: messagebox.showerror("Sai", f"Từ đúng phải là:\n{correct_word.upper()}")
-        self.current_idx += 1
-        self.load_question()
-
-def open_game_setup():
-    dialog = GameSetupDialog(app)
-    if dialog.result_num and dialog.result_data:
-        num = dialog.result_num
-        data = dialog.result_data
-        mode = dialog.result_mode
-        
-        if "Trắc nghiệm" in mode: QuizGameWindow(app, num, data)
-        elif "Đảo chữ" in mode: ScrambleGameWindow(app, num, data)
-        elif "Nối từ" in mode: MatchGameWindow(app, min(num, 10), data) 
-        elif "Nghe & Gõ" in mode: DictationGameWindow(app, num, data)
-
-# ==========================================
-# 5. GIAO DIỆN CHÍNH (CÓ THANH TASKBAR MỚI)
-# ==========================================
+        for i in range(self.pool_size):
+            if i not in active_pool_indices and self.row_pool[i]['data_idx'] != -1:
+                self.canvas.coords(self.row_pool[i]['id'], 0, -1000)
+                self.row_pool[i]['data_idx'] = -1
+                
+    def refresh_item(self, word):
+        for i, (w, vn, count, last) in enumerate(self.items):
+            if w == word:
+                detail = data_manager.get_detail(word, self.item_type)
+                self.items[i] = (w, detail['vn_meaning'], detail['study_count'], detail['last_studied'])
+                pool_idx = i % self.pool_size
+                if self.row_pool[pool_idx]['data_idx'] == i:
+                    self.row_pool[pool_idx]['data_idx'] = -1 
+                self.last_y = -1 # Force redraw
+                break
+# ================== GIAO DIỆN CHÍNH ==================
 app = ctk.CTk()
 app.title("Vocab Master Premium")
 app.geometry("1350x800")
 app.grid_columnconfigure(1, weight=1)
-app.grid_rowconfigure(1, weight=1) 
+app.grid_rowconfigure(1, weight=1)
 
-# ----- THANH TASKBAR Ở TRÊN CÙNG -----
 top_bar = ctk.CTkFrame(app, height=45, corner_radius=0, fg_color=BG_CARD)
 top_bar.grid(row=0, column=0, columnspan=2, sticky="ew")
 
-ctk.CTkButton(top_bar, text="➕ Thêm hàng loạt", font=FONT_BODY, fg_color="transparent", text_color=("black", "white"), hover_color="gray80", command=open_batch_add).pack(side="left", padx=10, pady=5)
-ctk.CTkButton(top_bar, text="🎮 Game Ôn Tập", font=FONT_BODY, fg_color="transparent", text_color=("black", "white"), hover_color="gray80", command=open_game_setup).pack(side="left", padx=10, pady=5)
-ctk.CTkButton(top_bar, text="📊 Thống kê", font=FONT_BODY, fg_color="transparent", text_color=("black", "white"), hover_color="gray80", command=show_statistics).pack(side="left", padx=10, pady=5)
-ctk.CTkButton(top_bar, text="💾 Sao lưu", font=FONT_BODY, fg_color="transparent", text_color=("black", "white"), hover_color="gray80", command=backup_data).pack(side="left", padx=10, pady=5)
+def open_batch_add(): BatchAddDialog(app)
+def show_statistics(): StatisticsWindow(app)
+def backup_data():
+    backup_path = os.path.join(BASE_DIR, f"backup_vocab_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+    with DB_LOCK:
+        conn = sqlite3.connect(DB_PATH)
+        backup_conn = sqlite3.connect(backup_path)
+        conn.backup(backup_conn)
+        backup_conn.close()
+        conn.close()
+    messagebox.showinfo("Sao lưu", f"Đã lưu cơ sở dữ liệu tại:\n{backup_path}")
 
-theme_menu = ctk.CTkOptionMenu(top_bar, values=["System", "Dark", "Light"], command=change_theme, width=110, font=FONT_BODY, fg_color=BG_CARD, button_color=BG_CARD, button_hover_color="gray80", text_color=("black", "white"))
+ctk.CTkButton(top_bar, text="➕ Thêm hàng loạt", font=FONT_BODY, fg_color="transparent", command=open_batch_add).pack(side="left", padx=10, pady=5)
+ctk.CTkButton(top_bar, text="🎮 Game Ôn Tập", font=FONT_BODY, fg_color="transparent", command=lambda: open_game_setup()).pack(side="left", padx=10, pady=5)
+ctk.CTkButton(top_bar, text="📊 Thống kê", font=FONT_BODY, fg_color="transparent", command=show_statistics).pack(side="left", padx=10, pady=5)
+ctk.CTkButton(top_bar, text="💾 Sao lưu", font=FONT_BODY, fg_color="transparent", command=backup_data).pack(side="left", padx=10, pady=5)
+theme_menu = ctk.CTkOptionMenu(top_bar, values=["System", "Dark", "Light"], command=lambda m: ctk.set_appearance_mode(m), width=110)
 theme_menu.pack(side="right", padx=10, pady=5)
 theme_menu.set("Giao diện")
-ctk.CTkButton(top_bar, text="📄 Mã nguồn", font=FONT_BODY, fg_color="transparent", text_color=("black", "white"), hover_color="gray80", command=show_source_code).pack(side="right", padx=10, pady=5)
 
-# ----- CỘT TRÁI (SIDEBAR) -----
 sidebar = ctk.CTkFrame(app, width=550, corner_radius=0, fg_color=BG_SIDEBAR)
 sidebar.grid(row=1, column=0, sticky="nsew")
 sidebar.grid_propagate(False)
 
-ctk.CTkLabel(sidebar, text="V O C A B", font=FONT_LOGO, text_color=COLOR_ACCENT).pack(pady=(30, 5))
+ctk.CTkLabel(sidebar, text="V O C A B", font=("Segoe UI", 24, "bold"), text_color=COLOR_ACCENT).pack(pady=(30, 5))
 ctk.CTkLabel(sidebar, text="Master Your English", font=FONT_BODY, text_color=TEXT_SUB).pack(pady=(0, 15))
 
-# Khu vực tìm / thêm nhanh
 add_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
 add_frame.pack(fill="x", padx=20, pady=10)
 entry_add = ctk.CTkEntry(add_frame, placeholder_text="Nhập nhanh 1 từ/cụm từ...", height=45, font=FONT_BODY)
 entry_add.pack(side="left", fill="x", expand=True)
-btn_add = ctk.CTkButton(add_frame, text="+", width=45, height=45, font=FONT_LOGO, fg_color=COLOR_ACCENT, command=add_item)
+btn_add = ctk.CTkButton(add_frame, text="+", width=45, height=45, font=("Segoe UI", 24, "bold"), fg_color=COLOR_ACCENT, command=lambda: add_item())
 btn_add.pack(side="right", padx=(10, 0))
 app.bind('<Return>', lambda e: add_item())
 
-# Sắp xếp
 sort_var = ctk.StringVar(value="Sắp xếp: Ngày học (Gần nhất)")
-sort_opts = ["Sắp xếp: Tên (A-Z)", "Sắp xếp: Ngày học (Gần nhất)", "Sắp xếp: Ngày học (Xa nhất)", "Sắp xếp: Số lần học (Nhiều nhất)", "Sắp xếp: Số lần học (Ít nhất)"]
-ctk.CTkOptionMenu(sidebar, variable=sort_var, values=sort_opts, command=refresh_list, font=FONT_BODY).pack(fill="x", padx=20, pady=(5,10))
+sort_options = ["Sắp xếp: Tên (A-Z)", "Sắp xếp: Ngày học (Gần nhất)", "Sắp xếp: Ngày học (Xa nhất)", "Sắp xếp: Số lần học (Nhiều nhất)", "Sắp xếp: Số lần học (Ít nhất)"]
+def on_sort_change(choice):
+    mapping = {"Sắp xếp: Tên (A-Z)": "name", "Sắp xếp: Ngày học (Gần nhất)": "recent", "Sắp xếp: Ngày học (Xa nhất)": "oldest", "Sắp xếp: Số lần học (Nhiều nhất)": "most", "Sắp xếp: Số lần học (Ít nhất)": "least"}
+    (scroll_vocab if tab_view.get() == "Từ Đơn" else scroll_phrase).set_sort(mapping.get(choice, "recent"))
+ctk.CTkOptionMenu(sidebar, variable=sort_var, values=sort_options, command=on_sort_change, font=FONT_BODY).pack(fill="x", padx=20, pady=(5,10))
 
-# Tabs
 tab_view = ctk.CTkTabview(sidebar, width=500)
 tab_view.pack(fill="both", expand=True, padx=20, pady=5)
 tab_view.add("Từ Đơn")
 tab_view.add("Cụm Từ")
 
-scroll_vocab = ctk.CTkScrollableFrame(tab_view.tab("Từ Đơn"), fg_color="transparent")
+scroll_vocab = VirtualScrollList(tab_view.tab("Từ Đơn"), item_type='vocab', bg=BG_SIDEBAR[1])
 scroll_vocab.pack(fill="both", expand=True)
-scroll_phrase = ctk.CTkScrollableFrame(tab_view.tab("Cụm Từ"), fg_color="transparent")
+scroll_phrase = VirtualScrollList(tab_view.tab("Cụm Từ"), item_type='phrase', bg=BG_SIDEBAR[1])
 scroll_phrase.pack(fill="both", expand=True)
 
-# ----- CỘT PHẢI (MAIN VIEW) -----
 main_view = ctk.CTkFrame(app, corner_radius=0, fg_color=BG_MAIN)
 main_view.grid(row=1, column=1, sticky="nsew")
-
 frame_welcome = ctk.CTkFrame(main_view, fg_color="transparent")
 frame_welcome.pack(expand=True)
 ctk.CTkLabel(frame_welcome, text="📚", font=("Segoe UI", 70)).pack(pady=10)
@@ -959,51 +509,638 @@ ctk.CTkLabel(frame_welcome, text="Học thôi nào!", font=("Segoe UI", 24, "bol
 
 detail_container = ctk.CTkScrollableFrame(main_view, fg_color="transparent")
 
+current_item, current_type = None, None
+
+def refresh_lists():
+    scroll_vocab.load_data()
+    scroll_phrase.load_data()
+
+def select_item(word, item_type):
+    global current_item, current_type
+    current_item, current_type = word, item_type
+    
+    # Cập nhật siêu tốc RAM-First
+    data_manager.update_progress(word, item_type)
+    detail = data_manager.get_detail(word, item_type)
+    if not detail: return
+    
+    # Cập nhật danh sách in-place
+    (scroll_vocab if item_type == 'vocab' else scroll_phrase).refresh_item(word)
+    
+    frame_welcome.pack_forget()
+    detail_container.pack(fill="both", expand=True, padx=40, pady=20)
+    lbl_title.configure(text=word.lower())
+    lbl_vn.configure(text=detail['vn_meaning'].capitalize() if detail['vn_meaning'] else "")
+    lbl_pos_text.configure(text=detail['pos'])
+    lbl_ex.configure(text=f'"{detail["sentence"]}"')
+    lbl_stats.configure(text=f"🔥 Số lần: {detail['study_count']}  •  🕒 Lần cuối: {detail['last_studied']}")
+    lbl_alert.pack_forget()
+    if detail['study_count'] >= 10 and detail['last_studied'] and (datetime.now() - datetime.strptime(detail['last_studied'], "%Y-%m-%d %H:%M")).days >= 3:
+        lbl_alert.configure(text="🚨 Cảnh báo: Từ/Cụm này lâu rồi chưa ôn lại!")
+        lbl_alert.pack(anchor="w", padx=25, pady=(10, 0))
+    txt_note.delete("1.0", "end")
+    txt_note.insert("1.0", detail.get("custom_sentence", ""))
+    lbl_img.configure(image="", text="Đang tìm ảnh...")
+    play_sound_system(word)
+    load_image_async(word, lbl_img)
+
+def add_item():
+    word = entry_add.get().strip().lower()
+    if not word: return
+    
+    if word in data_manager.vocab:
+        entry_add.delete(0, 'end'); tab_view.set("Từ Đơn"); select_item(word, 'vocab'); return
+    if word in data_manager.phrase:
+        entry_add.delete(0, 'end'); tab_view.set("Cụm Từ"); select_item(word, 'phrase'); return
+    
+    is_single = len(word.split()) == 1
+    item_type = 'vocab' if is_single else 'phrase'
+    entry_add.configure(state="disabled", placeholder_text="⏳ Đang tải dữ liệu...")
+    
+    def fetch_and_add():
+        ex, pos, vn = get_word_info(word) if is_single else get_phrase_info(word)
+        data_manager.add_or_update(word, item_type, ex, pos, vn, "")
+        app.after(0, lambda: [entry_add.configure(state="normal", placeholder_text="Nhập nhanh 1 từ/cụm từ..."), entry_add.delete(0, 'end'), tab_view.set("Từ Đơn" if item_type == 'vocab' else "Cụm Từ"), refresh_lists(), select_item(word, item_type)])
+    executor.submit(fetch_and_add)
+
+def edit_vn_meaning():
+    if not current_item: return
+    new_vn = ctk.CTkInputDialog(text=f"Sửa nghĩa tiếng Việt của '{current_item}':", title="Sửa nghĩa").get_input()
+    if new_vn and new_vn.strip():
+        data_manager.update_field(current_item, current_type, 'vn_meaning', new_vn.strip())
+        lbl_vn.configure(text=new_vn.strip().capitalize())
+        (scroll_vocab if current_type == 'vocab' else scroll_phrase).refresh_item(current_item)
+
+def item_delete_cmd():
+    global current_item, current_type
+    if current_item and messagebox.askyesno("Xóa", f"Xóa '{current_item}'?"):
+        data_manager.delete(current_item, current_type)
+        detail_container.pack_forget(); frame_welcome.pack(expand=True)
+        refresh_lists()
+        current_item, current_type = None, None
+
+def save_custom_note():
+    if current_item:
+        data_manager.update_field(current_item, current_type, 'custom_sentence', txt_note.get("1.0", "end-1c"))
+        messagebox.showinfo("OK", "Đã lưu ghi chú")
+
 c1 = ctk.CTkFrame(detail_container, corner_radius=15, fg_color="transparent")
 c1.pack(fill="x", pady=(10, 20))
 hl = ctk.CTkFrame(c1, fg_color="transparent")
 hl.pack(side="left")
-lbl_title = ctk.CTkLabel(hl, text="word", font=FONT_TITLE, wraplength=400, justify="left")
+lbl_title = ctk.CTkLabel(hl, text="", font=FONT_TITLE, wraplength=400, justify="left")
 lbl_title.pack(anchor="w")
 vf = ctk.CTkFrame(hl, fg_color="transparent")
 vf.pack(anchor="w")
-lbl_vn = ctk.CTkLabel(vf, text="nghĩa", font=FONT_VN, text_color=COLOR_SUCCESS[0], wraplength=350, justify="left")
+lbl_vn = ctk.CTkLabel(vf, text="", font=FONT_VN, text_color=COLOR_SUCCESS[0], wraplength=350, justify="left")
 lbl_vn.pack(side="left")
 ctk.CTkButton(vf, text="✏️", width=30, height=30, fg_color="transparent", text_color=COLOR_ACCENT, command=edit_vn_meaning).pack(side="left", padx=(10, 0))
-
 pf = ctk.CTkFrame(c1, corner_radius=20, fg_color=COLOR_ACCENT)
 pf.pack(side="left", pady=(10,0), padx=20)
-lbl_pos_text = ctk.CTkLabel(pf, text="pos", font=("Segoe UI", 14), text_color="white")
+lbl_pos_text = ctk.CTkLabel(pf, text="", font=("Segoe UI", 14), text_color="white")
 lbl_pos_text.pack(padx=15, pady=2)
-ctk.CTkButton(c1, text="🔊 Nghe", width=100, height=40, corner_radius=20, fg_color=BG_CARD, text_color=("black", "white"), command=lambda: play_sound_system(current_item)).pack(side="right", pady=20)
+ctk.CTkButton(c1, text="🔊 Nghe", width=100, height=40, corner_radius=20, fg_color=BG_CARD, command=lambda: play_sound_system(current_item) if current_item else None).pack(side="right", pady=20)
 
 c2 = ctk.CTkFrame(detail_container, fg_color="transparent")
 c2.pack(fill="x", pady=10)
 img_f = ctk.CTkFrame(c2, corner_radius=15, fg_color=BG_CARD, width=180, height=180)
-img_f.pack(side="left")
-img_f.pack_propagate(False)
+img_f.pack(side="left"); img_f.pack_propagate(False)
 lbl_img = ctk.CTkLabel(img_f, text="⌛", font=FONT_BODY, text_color=TEXT_SUB)
 lbl_img.pack(expand=True)
-
 c2_info = ctk.CTkFrame(c2, corner_radius=15, fg_color=BG_CARD)
 c2_info.pack(side="left", fill="both", expand=True, padx=(20, 0))
 lbl_alert = ctk.CTkLabel(c2_info, text="", font=("Segoe UI", 13, "bold"), text_color=COLOR_DANGER[0])
-lbl_stats = ctk.CTkLabel(c2_info, text="Stats", font=("Segoe UI", 13), text_color=TEXT_SUB)
+lbl_stats = ctk.CTkLabel(c2_info, text="", font=FONT_BODY, text_color=TEXT_SUB)
 lbl_stats.pack(anchor="w", padx=25, pady=(20, 5))
-lbl_ex = ctk.CTkLabel(c2_info, text="Example", font=FONT_ITALIC, wraplength=450, justify="left")
+lbl_ex = ctk.CTkLabel(c2_info, text="", font=FONT_ITALIC, wraplength=450, justify="left")
 lbl_ex.pack(anchor="w", padx=25, pady=(5, 15))
-ctk.CTkButton(c2_info, text="▶ Nghe câu ví dụ", border_width=1, fg_color="transparent", text_color=COLOR_ACCENT, command=lambda: play_sound_system((vocab_data if current_type == 'vocab' else phrase_data)[current_item]['sentence'])).pack(anchor="w", padx=25)
+ctk.CTkButton(c2_info, text="▶ Nghe câu ví dụ", border_width=1, fg_color="transparent", command=lambda: play_sound_system(data_manager.get_detail(current_item, current_type)['sentence'] if current_item else "")).pack(anchor="w", padx=25)
 
 c3 = ctk.CTkFrame(detail_container, corner_radius=15, fg_color=BG_CARD)
 c3.pack(fill="x", pady=20)
-ctk.CTkLabel(c3, text="📝 Ghi chú của bạn / Đặt câu tự do", font=FONT_H2).pack(anchor="w", padx=25, pady=(20, 10))
+ctk.CTkLabel(c3, text="📝 Ghi chú của bạn / Đặt câu tự do", font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=25, pady=(20, 10))
 txt_note = ctk.CTkTextbox(c3, height=100, corner_radius=8, fg_color=BG_MAIN, font=FONT_BODY)
 txt_note.pack(fill="x", padx=25, pady=(0, 20))
-
 bf = ctk.CTkFrame(c3, fg_color="transparent")
 bf.pack(fill="x", padx=25, pady=(0, 25))
-ctk.CTkButton(bf, text="💾 Lưu", fg_color=COLOR_SUCCESS, width=100, command=lambda: [(vocab_data if current_type == 'vocab' else phrase_data)[current_item].update({"custom_sentence": txt_note.get("1.0", "end-1c")}), save_data(data_json), messagebox.showinfo("OK", "Đã lưu")]).pack(side="left")
-ctk.CTkButton(bf, text="🗑 Xóa Mục", fg_color="transparent", text_color=COLOR_DANGER[0], border_width=1, border_color=COLOR_DANGER[0], width=80, command=delete_item).pack(side="right")
+ctk.CTkButton(bf, text="💾 Lưu", fg_color=COLOR_SUCCESS, width=100, command=save_custom_note).pack(side="left")
+ctk.CTkButton(bf, text="🗑 Xóa Mục", fg_color="transparent", text_color=COLOR_DANGER[0], border_width=1, border_color=COLOR_DANGER[0], width=80, command=item_delete_cmd).pack(side="right")
 
-refresh_list()
-app.mainloop()
+# ================== GAME ÔN TẬP (GIAO DIỆN HIỆN ĐẠI & SỬA LỖI) ==================
+def get_game_data(source_type):
+    today = datetime.now().strftime("%Y-%m-%d")
+    items = []
+    for t, data_dict in [('vocab', data_manager.vocab), ('phrase', data_manager.phrase)]:
+        for word, d in data_dict.items():
+            if source_type == "Chưa ôn hôm nay":
+                if not d['last_studied'] or d['last_studied'][:10] != today:
+                    items.append({"word": word, "vn_meaning": d['vn_meaning'], "item_type": t, "last_studied": d['last_studied'], "study_count": d['study_count']})
+            else:
+                items.append({"word": word, "vn_meaning": d['vn_meaning'], "item_type": t, "last_studied": d['last_studied'], "study_count": d['study_count']})
+                
+    items.sort(key=lambda x: (x['study_count'], - (datetime.now() - datetime.strptime(x['last_studied'], "%Y-%m-%d %H:%M")).days if x['last_studied'] else 0))
+    return items
+
+class GameSetupDialog(ctk.CTkToplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Cài đặt Game")
+        self.geometry("550x500")
+        self.transient(master)
+        self.grab_set()
+        self.result_num, self.result_mode, self.result_data = None, None, None
+        
+        # Main Card
+        card = ctk.CTkFrame(self, corner_radius=15, fg_color=BG_CARD)
+        card.pack(fill="both", expand=True, padx=25, pady=25)
+
+        ctk.CTkLabel(card, text="🎮 CÀI ĐẶT TRÒ CHƠI", font=("Segoe UI", 22, "bold"), text_color=COLOR_ACCENT).pack(pady=(25, 10))
+        
+        self.source_mode = ctk.CTkSegmentedButton(card, values=["Ngẫu nhiên", "Chưa ôn hôm nay"], font=FONT_BODY, command=self.update_slider_max)
+        self.source_mode.set("Chưa ôn hôm nay")
+        self.source_mode.pack(pady=10, fill="x", padx=40)
+        
+        self.lbl_empty_alert = ctk.CTkLabel(card, text="", text_color=COLOR_SUCCESS[0], font=("Segoe UI", 12, "italic"))
+        self.lbl_empty_alert.pack()
+        
+        self.game_mode = ctk.CTkSegmentedButton(card, values=["Trắc nghiệm", "Đảo chữ", "Nối từ", "Nghe & Gõ"], font=FONT_BODY)
+        self.game_mode.set("Trắc nghiệm")
+        self.game_mode.pack(pady=10, fill="x", padx=40)
+        
+        self.lbl_val = ctk.CTkLabel(card, text="5 Từ", font=("Segoe UI", 32, "bold"), text_color=COLOR_SUCCESS[0])
+        self.lbl_val.pack(pady=(15, 0))
+        
+        self.slider = ctk.CTkSlider(card, from_=1, to=10, number_of_steps=9, command=lambda v: self.lbl_val.configure(text=f"{int(v)} Từ"))
+        self.slider.pack(fill="x", padx=50, pady=10)
+        
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(pady=(20, 25), fill="x", padx=40)
+        ctk.CTkButton(btn_frame, text="Hủy", width=120, height=40, fg_color="transparent", border_width=1, text_color=TEXT_SUB, command=self.destroy).pack(side="left")
+        self.btn_start = ctk.CTkButton(btn_frame, text="Bắt đầu", width=120, height=40, font=("Segoe UI", 14, "bold"), fg_color=COLOR_SUCCESS[0], hover_color="#28a745", command=self.on_ok)
+        self.btn_start.pack(side="right")
+        
+        self.update_slider_max(self.source_mode.get())
+        self.wait_window()
+    
+    def update_slider_max(self, mode):
+        data = get_game_data(mode)
+        max_words = min(len(data), 50)
+        if max_words == 0:
+            self.lbl_empty_alert.configure(text="🎉 Bạn đã ôn hết từ vựng hôm nay.")
+            self.slider.configure(state="disabled")
+            self.btn_start.configure(state="disabled")
+            self.lbl_val.configure(text="0 Từ")
+        else:
+            self.lbl_empty_alert.configure(text="")
+            self.slider.configure(state="normal", from_=1, to=max_words, number_of_steps=max_words-1 if max_words>1 else 1)
+            self.btn_start.configure(state="normal")
+            val = min(5, max_words)
+            self.slider.set(val)
+            self.lbl_val.configure(text=f"{int(val)} Từ")
+            
+    def on_ok(self):
+        self.result_num, self.result_mode, self.result_data = int(self.slider.get()), self.game_mode.get(), get_game_data(self.source_mode.get())
+        self.destroy()
+
+def open_game_setup():
+    d = GameSetupDialog(app)
+    if d.result_num and d.result_data:
+        if d.result_mode == "Trắc nghiệm": QuizGameWindow(app, d.result_num, d.result_data)
+        elif d.result_mode == "Đảo chữ": ScrambleGameWindow(app, d.result_num, d.result_data)
+        elif d.result_mode == "Nối từ": MatchGameWindow(app, min(d.result_num, 10), d.result_data)
+        elif d.result_mode == "Nghe & Gõ": DictationGameWindow(app, d.result_num, d.result_data)
+
+class BaseGameWindow(ctk.CTkToplevel):
+    def __init__(self, master, title):
+        super().__init__(master)
+        self.title(title)
+        self.geometry("700x550") # To hơn cho thoáng
+        self.transient(master)
+        self.grab_set()
+        self.questions = []
+        self.current_idx = 0
+        self.score = 0
+        
+        # Thanh trạng thái phía trên (Progress)
+        self.top_frame = ctk.CTkFrame(self, height=60, fg_color="transparent")
+        self.top_frame.pack(fill="x", padx=30, pady=(20, 10))
+        
+        self.lbl_progress_text = ctk.CTkLabel(self.top_frame, text="Câu 0/0", font=("Segoe UI", 16, "bold"), text_color=TEXT_SUB)
+        self.lbl_progress_text.pack(side="left")
+        
+        self.lbl_score = ctk.CTkLabel(self.top_frame, text="Điểm: 0", font=("Segoe UI", 16, "bold"), text_color=COLOR_SUCCESS[0])
+        self.lbl_score.pack(side="right")
+        
+        self.progress_bar = ctk.CTkProgressBar(self, height=8, progress_color=COLOR_ACCENT)
+        self.progress_bar.pack(fill="x", padx=30, pady=(0, 20))
+        self.progress_bar.set(0)
+
+        # Khu vực chơi chính
+        self.game_area = ctk.CTkFrame(self, corner_radius=15, fg_color=BG_CARD)
+        self.game_area.pack(fill="both", expand=True, padx=30, pady=(0, 30))
+
+class QuizGameWindow(BaseGameWindow):
+    def __init__(self, master, num, data):
+        super().__init__(master, "Game Trắc Nghiệm")
+        self.game_data = data
+        self.prepare(num)
+        self.build()
+        self.load()
+
+    def prepare(self, num):
+        selected = random.sample(self.game_data, min(num, len(self.game_data)))
+        for item in selected:
+            # Lấy list các từ khác làm đáp án nhiễu (Chống lỗi nếu DB ít hơn 4 từ)
+            others = [x['word'] for x in self.game_data if x['word'] != item['word']]
+            opts = [item['word']] + random.sample(others, min(3, len(others)))
+            random.shuffle(opts)
+            self.questions.append((item['word'], item['vn_meaning'], opts, item['item_type']))
+
+    def build(self):
+        self.lbl_q = ctk.CTkLabel(self.game_area, text="", font=("Segoe UI", 28, "bold"), text_color=COLOR_ACCENT, wraplength=600)
+        self.lbl_q.pack(pady=(40, 30), expand=True)
+        
+        # Grid 2x2 cho nút bấm
+        self.btn_grid = ctk.CTkFrame(self.game_area, fg_color="transparent")
+        self.btn_grid.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.btn_grid.grid_columnconfigure((0, 1), weight=1)
+        
+        self.btn_opts = []
+        for i in range(4):
+            btn = ctk.CTkButton(self.btn_grid, text="", height=60, corner_radius=12, font=("Segoe UI", 16, "bold"), 
+                                fg_color=BG_MAIN, text_color=("black", "white"), hover_color=COLOR_ACCENT,
+                                command=lambda idx=i: self.check(idx))
+            btn.grid(row=i//2, column=i%2, padx=10, pady=10, sticky="nsew")
+            self.btn_opts.append(btn)
+
+    def load(self):
+        if self.current_idx >= len(self.questions):
+            messagebox.showinfo("Kết thúc", f"Bạn làm đúng {self.score}/{len(self.questions)} câu.")
+            refresh_lists()
+            self.destroy()
+            return
+            
+        word, vn, opts, _ = self.questions[self.current_idx]
+        
+        self.lbl_progress_text.configure(text=f"Câu {self.current_idx+1}/{len(self.questions)}")
+        self.progress_bar.set((self.current_idx) / len(self.questions))
+        self.lbl_score.configure(text=f"Điểm: {self.score}")
+        self.lbl_q.configure(text=vn.capitalize())
+        
+        for i, btn in enumerate(self.btn_opts):
+            if i < len(opts):
+                btn.configure(text=opts[i].capitalize(), state="normal")
+            else:
+                btn.configure(text="", state="disabled") # Ẩn nút nếu thiếu từ nhiễu
+
+    def check(self, idx):
+        cw, _, opts, ty = self.questions[self.current_idx]
+        if opts[idx] == cw: 
+            data_manager.update_progress(cw, ty)
+            self.score += 1
+            play_sound_system(cw)
+        else: 
+            messagebox.showerror("Sai rồi", f"Đáp án đúng là:\n{cw.upper()}")
+        self.current_idx += 1
+        self.load()
+
+class ScrambleGameWindow(BaseGameWindow):
+    def __init__(self, master, num, data):
+        super().__init__(master, "Game Đảo Chữ")
+        self.game_data = data
+        self.prepare(num)
+        self.build()
+        self.load()
+
+    def prepare(self, num):
+        for item in random.sample(self.game_data, min(num, len(self.game_data))): 
+            self.questions.append((item['word'], item['vn_meaning'], item['item_type']))
+
+    def build(self):
+        self.lbl_vn = ctk.CTkLabel(self.game_area, text="", font=("Segoe UI", 20, "bold"), text_color=TEXT_SUB, wraplength=600)
+        self.lbl_vn.pack(pady=(30, 10))
+        
+        self.lbl_scr = ctk.CTkLabel(self.game_area, text="", font=("Courier New", 42, "bold"), text_color=COLOR_ACCENT, wraplength=600)
+        self.lbl_scr.pack(pady=(10, 30))
+        
+        self.entry = ctk.CTkEntry(self.game_area, font=("Segoe UI", 24, "bold"), justify="center", height=60, corner_radius=12)
+        self.entry.pack(fill="x", padx=60, pady=10)
+        self.entry.bind('<Return>', lambda e: self.check())
+        
+        bf = ctk.CTkFrame(self.game_area, fg_color="transparent")
+        bf.pack(pady=20, fill="x", padx=60)
+        ctk.CTkButton(bf, text="🔊 Nghe gợi ý", width=140, height=45, fg_color=BG_MAIN, text_color=("black", "white"), command=lambda: play_sound_system(self.questions[self.current_idx][0])).pack(side="left")
+        ctk.CTkButton(bf, text="Kiểm tra", width=140, height=45, font=("Segoe UI", 14, "bold"), fg_color=COLOR_ACCENT, command=self.check).pack(side="right")
+
+    def load(self):
+        if self.current_idx >= len(self.questions):
+            messagebox.showinfo("Kết thúc", f"Bạn gõ đúng {self.score}/{len(self.questions)} từ.")
+            refresh_lists()
+            self.destroy()
+            return
+            
+        word, vn, _ = self.questions[self.current_idx]
+        self.lbl_progress_text.configure(text=f"Câu {self.current_idx+1}/{len(self.questions)}")
+        self.progress_bar.set((self.current_idx) / len(self.questions))
+        self.lbl_score.configure(text=f"Điểm: {self.score}")
+        self.lbl_vn.configure(text=vn.capitalize())
+        
+        scr = []
+        for w in word.split():
+            chars = list(w)
+            random.shuffle(chars)
+            attempts = 0 # Tránh lặp vô hạn nếu từ có các chữ giống nhau (vd: "eee")
+            while ''.join(chars) == w and len(w) > 2 and attempts < 10: 
+                random.shuffle(chars)
+                attempts += 1
+            scr.append(' '.join(chars).upper())
+            
+        self.lbl_scr.configure(text="   ".join(scr))
+        self.entry.delete(0, 'end')
+        self.entry.focus()
+
+    def check(self):
+        cw, _, ty = self.questions[self.current_idx]
+        if self.entry.get().strip().lower() == cw: 
+            data_manager.update_progress(cw, ty)
+            self.score += 1
+            play_sound_system(cw)
+        else: 
+            messagebox.showerror("Sai rồi", f"Chính tả đúng phải là:\n{cw.upper()}")
+        self.current_idx += 1
+        self.load()
+
+class DictationGameWindow(BaseGameWindow):
+    def __init__(self, master, num, data):
+        super().__init__(master, "Game Nghe & Gõ")
+        self.game_data = data
+        self.prepare(num)
+        self.build()
+        self.load()
+
+    def prepare(self, num):
+        for item in random.sample(self.game_data, min(num, len(self.game_data))): 
+            self.questions.append((item['word'], item['vn_meaning'], item['item_type']))
+
+    def build(self):
+        btn_play = ctk.CTkButton(self.game_area, text="▶ NGHE TỪ VỰNG", font=("Segoe UI", 24, "bold"), height=90, width=300, corner_radius=20, command=lambda: play_sound_system(self.questions[self.current_idx][0]))
+        btn_play.pack(pady=(40, 20))
+        
+        self.lbl_hint = ctk.CTkLabel(self.game_area, text="---", font=("Segoe UI", 16, "italic"), text_color=TEXT_SUB, wraplength=500)
+        self.lbl_hint.pack(pady=(0, 20))
+        
+        self.entry = ctk.CTkEntry(self.game_area, font=("Segoe UI", 24, "bold"), justify="center", height=60, corner_radius=12)
+        self.entry.pack(fill="x", padx=60, pady=10)
+        self.entry.bind('<Return>', lambda e: self.check())
+        
+        bf = ctk.CTkFrame(self.game_area, fg_color="transparent")
+        bf.pack(pady=20, fill="x", padx=60)
+        ctk.CTkButton(bf, text="💡 Gợi ý nghĩa", width=140, height=45, fg_color=BG_MAIN, text_color=("black", "white"), command=lambda: self.lbl_hint.configure(text=f"Nghĩa: {self.questions[self.current_idx][1].capitalize()}")).pack(side="left")
+        ctk.CTkButton(bf, text="Kiểm tra", width=140, height=45, font=("Segoe UI", 14, "bold"), fg_color=COLOR_ACCENT, command=self.check).pack(side="right")
+
+    def load(self):
+        if self.current_idx >= len(self.questions):
+            messagebox.showinfo("Kết thúc", f"Bạn nghe gõ đúng {self.score}/{len(self.questions)} từ.")
+            refresh_lists()
+            self.destroy()
+            return
+            
+        self.lbl_progress_text.configure(text=f"Câu {self.current_idx+1}/{len(self.questions)}")
+        self.progress_bar.set((self.current_idx) / len(self.questions))
+        self.lbl_score.configure(text=f"Điểm: {self.score}")
+        self.lbl_hint.configure(text="---")
+        self.entry.delete(0, 'end')
+        self.entry.focus()
+        play_sound_system(self.questions[self.current_idx][0])
+
+    def check(self):
+        cw, _, ty = self.questions[self.current_idx]
+        if self.entry.get().strip().lower() == cw: 
+            data_manager.update_progress(cw, ty)
+            self.score += 1
+            play_sound_system(cw)
+        else: 
+            messagebox.showerror("Sai rồi", f"Từ đúng phải là:\n{cw.upper()}")
+        self.current_idx += 1
+        self.load()
+
+class MatchGameWindow(ctk.CTkToplevel):
+    def __init__(self, master, num, data):
+        super().__init__(master)
+        self.title("Game Nối Từ")
+        self.geometry("850x650")
+        self.transient(master)
+        self.grab_set()
+        self.score = 0
+        self.sel_en = self.sel_vi = None
+        self.game_data = data
+        self.pairs = [(i['word'], i['vn_meaning'], i['item_type']) for i in random.sample(data, min(num, min(10, len(data))))]
+        self.btn_en = {}
+        self.btn_vi = {}
+        self.build()
+
+    def build(self):
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.pack(fill="x", padx=30, pady=(20, 0))
+        ctk.CTkLabel(top, text="🔗 Ghép từ tiếng Anh với nghĩa tiếng Việt", font=("Segoe UI", 20, "bold"), text_color=COLOR_ACCENT).pack(side="left")
+        self.lbl_score = ctk.CTkLabel(top, text=f"Điểm: 0/{len(self.pairs)}", font=("Segoe UI", 18, "bold"), text_color=COLOR_SUCCESS[0])
+        self.lbl_score.pack(side="right")
+
+        gf = ctk.CTkFrame(self, fg_color="transparent")
+        gf.pack(fill="both", expand=True, padx=30, pady=20)
+        gf.grid_columnconfigure(0, weight=1)
+        gf.grid_columnconfigure(1, weight=1)
+        
+        el, vl = list(self.pairs), list(self.pairs)
+        random.shuffle(el)
+        random.shuffle(vl)
+        
+        fe = ctk.CTkFrame(gf, fg_color=BG_CARD, corner_radius=15)
+        fe.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        fv = ctk.CTkFrame(gf, fg_color=BG_CARD, corner_radius=15)
+        fv.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        
+        for w, _, _ in el:
+            b = ctk.CTkButton(fe, text=w.capitalize(), height=55, corner_radius=10, font=("Segoe UI", 16, "bold"), fg_color=BG_MAIN, text_color=("black", "white"), hover_color=COLOR_ACCENT, command=lambda w=w: self.sel(w, 'en'))
+            b.pack(fill="x", padx=15, pady=8)
+            self.btn_en[w] = b
+            
+        for _, v, _ in vl:
+            b = ctk.CTkButton(fv, text=v.capitalize(), height=55, corner_radius=10, font=("Segoe UI", 15), fg_color=BG_MAIN, text_color=("black", "white"), hover_color=COLOR_SUCCESS[0], command=lambda v=v: self.sel(v, 'vi'))
+            b.pack(fill="x", padx=15, pady=8)
+            self.btn_vi[v] = b
+
+    def sel(self, val, lang):
+        if lang == 'en':
+            for b in self.btn_en.values(): b.configure(border_width=0)
+            self.sel_en = val
+            self.btn_en[val].configure(border_width=2, border_color=COLOR_ACCENT)
+        else:
+            for b in self.btn_vi.values(): b.configure(border_width=0)
+            self.sel_vi = val
+            self.btn_vi[val].configure(border_width=2, border_color=COLOR_SUCCESS[0])
+            
+        if self.sel_en and self.sel_vi:
+            pair = next((p for p in self.pairs if p[0] == self.sel_en and p[1] == self.sel_vi), None)
+            if pair:
+                play_sound_system(pair[0])
+                data_manager.update_progress(pair[0], pair[2])
+                self.btn_en[pair[0]].destroy()
+                self.btn_vi[pair[1]].destroy()
+                del self.btn_en[pair[0]]
+                del self.btn_vi[pair[1]]
+                self.score += 1
+                self.lbl_score.configure(text=f"Điểm: {self.score}/{len(self.pairs)}")
+                
+                if self.score == len(self.pairs): 
+                    messagebox.showinfo("Hoàn thành", "Chúc mừng! Bạn đã nối đúng tất cả!")
+                    refresh_lists()
+                    self.destroy()
+            else:
+                messagebox.showerror("Sai", "Hai thẻ này không khớp nhau!")
+                
+            self.sel_en = self.sel_vi = None
+            for b in self.btn_en.values(): b.configure(border_width=0)
+            for b in self.btn_vi.values(): b.configure(border_width=0)
+# ================== BATCH ADD ==================
+class BatchAddDialog(ctk.CTkToplevel):
+    def __init__(self, master):
+        super().__init__(master); self.title("Thêm Hàng Loạt"); self.geometry("500x450"); self.transient(master); self.grab_set()
+        ctk.CTkLabel(self, text="📝 THÊM TỪ VỰNG HÀNG LOẠT", font=("Segoe UI", 18, "bold"), text_color=COLOR_ACCENT).pack(pady=(20,5))
+        ctk.CTkLabel(self, text="Ngăn cách nhau bằng dấu phẩy (,)", text_color=TEXT_SUB, font=("Segoe UI", 13)).pack(pady=(0,15))
+        self.textbox = ctk.CTkTextbox(self, height=200, font=("Segoe UI", 15)); self.textbox.pack(fill="x", padx=25, pady=10)
+        self.lbl_status = ctk.CTkLabel(self, text="Sẵn sàng...", text_color=COLOR_SUCCESS[0]); self.lbl_status.pack(pady=5)
+        bf = ctk.CTkFrame(self, fg_color="transparent"); bf.pack(pady=10)
+        ctk.CTkButton(bf, text="Hủy bỏ", width=100, fg_color="transparent", border_width=1, command=self.destroy).pack(side="left", padx=10)
+        self.btn_start = ctk.CTkButton(bf, text="Bắt đầu", width=140, command=self.start); self.btn_start.pack(side="right", padx=10)
+    
+    def start(self):
+        content = self.textbox.get("1.0", "end").strip()
+        if not content: return
+        words = list(dict.fromkeys([w.strip().lower() for w in content.split(",") if w.strip()]))
+        if not words: return
+        self.btn_start.configure(state="disabled"); self.textbox.configure(state="disabled")
+        threading.Thread(target=self.process_parallel, args=(words,), daemon=True).start()
+    
+    def process_parallel(self, words):
+        total = len(words)
+        def fetch_word(w):
+            if w in data_manager.vocab or w in data_manager.phrase: return None
+            is_single = len(w.split()) == 1
+            ex, pos, vn = get_word_info(w) if is_single else get_phrase_info(w)
+            return (w, 'vocab' if is_single else 'phrase', ex, pos, vn, "")
+        
+        futures = [executor.submit(fetch_word, w) for w in words]
+        results = []
+        for i, future in enumerate(futures):
+            app.after(0, lambda idx=i: self.lbl_status.configure(text=f"⏳ Đang gọi dữ liệu API song song ({idx+1}/{total})..."))
+            res = future.result()
+            if res: results.append(res)
+            
+        if results:
+            app.after(0, lambda: self.lbl_status.configure(text=f"⏳ Đang cập nhật hệ thống..."))
+            for r in results: data_manager.add_or_update(r[0], r[1], r[2], r[3], r[4], r[5], sync_db=False)
+            
+            def save_batch(batch):
+                with DB_LOCK:
+                    conn = sqlite3.connect(DB_PATH)
+                    conn.execute("BEGIN TRANSACTION")
+                    for r in batch:
+                        conn.execute(f"INSERT INTO {r[1]} (word, sentence, pos, vn_meaning, custom_sentence, last_studied, study_count) VALUES (?,?,?,?,?,?,?)",
+                                     (r[0], r[2], r[3], r[4], r[5], "", 0))
+                    conn.commit()
+                    conn.close()
+            executor.submit(save_batch, results)
+                
+        app.after(0, lambda: self.finish(len(results)))
+        
+    def finish(self, added):
+        if added == 0: self.lbl_status.configure(text="Tất cả từ đã có sẵn!", text_color="gray")
+        else: self.lbl_status.configure(text=f"✅ Hoàn tất! Đã thêm cực nhanh {added} mục.", text_color=COLOR_SUCCESS[0])
+        self.btn_start.configure(text="Đóng", state="normal", command=self.destroy)
+        refresh_lists()
+
+# ================== STATISTICS (TÍNH TOÁN TRỰC TIẾP TRÊN RAM SIÊU TỐC) ==================
+class StatisticsWindow(ctk.CTkToplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Thống Kê Học Tập")
+        self.geometry("700x600")
+        self.transient(master)
+        
+        # Đảm bảo cửa sổ luôn ở trên và nhận focus
+        self.grab_set()
+        self.focus_force()
+
+        self.build_ui()
+
+    def get_stats_from_ram(self):
+        """Thuật toán đếm số liệu trực tiếp từ RAM, không đụng tới SQLite giúp tốc độ tức thời"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        total_vocab = len(data_manager.vocab)
+        total_phrase = len(data_manager.phrase)
+        
+        # Lấy số từ đã học hôm nay từ tracker trên RAM
+        studied_today = len(data_manager.tracker.get(today, set()))
+
+        mastered, warned, unlearned = 0, 0, 0
+
+        # Quét qua toàn bộ từ vựng và cụm từ (Chỉ tốn ~0.001s cho 10.000 từ)
+        for collection in (data_manager.vocab.values(), data_manager.phrase.values()):
+            for item in collection:
+                c = item.get('study_count', 0)
+                if c == 0:
+                    unlearned += 1
+                elif c >= 15:
+                    mastered += 1
+
+                # Tính cảnh báo (học >= 10 lần nhưng đã bỏ bê 3 ngày)
+                if c >= 10 and item.get('last_studied'):
+                    try:
+                        # Chỉ lấy 10 ký tự đầu (YYYY-MM-DD) để so sánh ngày cho chuẩn xác
+                        last_date = datetime.strptime(item['last_studied'][:10], "%Y-%m-%d")
+                        if (datetime.now() - last_date).days >= 3:
+                            warned += 1
+                    except:
+                        pass
+
+        return total_vocab, total_phrase, studied_today, mastered, warned, unlearned
+
+    def build_ui(self):
+        ctk.CTkLabel(self, text="📊 TỔNG QUAN HỌC TẬP", font=("Segoe UI", 26, "bold"), text_color=COLOR_ACCENT).pack(pady=(30, 20))
+        
+        grid_frame = ctk.CTkFrame(self, fg_color="transparent")
+        grid_frame.pack(fill="both", expand=True, padx=30, pady=10)
+        grid_frame.grid_columnconfigure(0, weight=1)
+        grid_frame.grid_columnconfigure(1, weight=1)
+        
+        # Lấy dữ liệu ngay lập tức
+        tv, tp, st, m, w, u = self.get_stats_from_ram()
+
+        def create_card(row, col, title, value, color):
+            card = ctk.CTkFrame(grid_frame, corner_radius=15, fg_color=BG_CARD)
+            card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
+            ctk.CTkLabel(card, text=title, font=("Segoe UI", 15), text_color=TEXT_SUB).pack(pady=(25, 5))
+            ctk.CTkLabel(card, text=str(value), font=("Segoe UI", 48, "bold"), text_color=color).pack(pady=(0, 25))
+
+        create_card(0, 0, "📚 Tổng Từ Đơn", tv, COLOR_ACCENT)
+        create_card(0, 1, "💬 Tổng Cụm Từ", tp, COLOR_ACCENT)
+        create_card(1, 0, "🔥 Đã học hôm nay", st, COLOR_SUCCESS[0])
+        create_card(1, 1, "✅ Đã thuộc (>15 lần)", m, COLOR_SUCCESS[0])
+        create_card(2, 0, "🚨 Cảnh báo (Lâu chưa ôn)", w, COLOR_DANGER[0])
+        create_card(2, 1, "🆕 Chưa học (0 lần)", u, "gray")
+
+# Biến toàn cục để tránh mở nhiều cửa sổ thống kê cùng lúc
+stat_window_instance = None
+
+def show_statistics():
+    global stat_window_instance
+    if stat_window_instance is None or not stat_window_instance.winfo_exists():
+        stat_window_instance = StatisticsWindow(app)
+    else:
+        stat_window_instance.focus_force()
+
+
+if __name__ == "__main__":
+    app.mainloop()

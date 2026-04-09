@@ -228,8 +228,8 @@
             "sentence": "The market for brightly colored clothing was brisk last year.",
             "pos": "Danh từ",
             "vn_meaning": "thị trường",
-            "last_studied": "",
-            "study_count": 0,
+            "last_studied": "2026-04-09 13:34",
+            "study_count": 1,
             "custom_sentence": ""
         },
         "persuasion": {
@@ -619,7 +619,8 @@
             "be a",
             "imply",
             "promise",
-            "protect"
+            "protect",
+            "market"
         ]
     },
     "phrase_data": {}
