@@ -15,17 +15,50 @@ import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 import time
-
+import sys
+import shutil
 # ================== CẤU HÌNH & KHỞI TẠO ==================
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ================== CẤU HÌNH ĐƯỜNG DẪN AN TOÀN ==================
+# 1. Tìm thư mục AppData của Windows (Nơi an toàn nhất để lưu dữ liệu)
+if sys.platform == "win32":
+    APP_DATA_DIR = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'VocabMasterPremium')
+else:
+    APP_DATA_DIR = os.path.join(os.path.expanduser('~'), '.vocabmasterpremium')
+
+# 2. Bắt buộc tạo thư mục trước khi làm bất cứ việc gì khác
+try:
+    os.makedirs(APP_DATA_DIR, exist_ok=True)
+except Exception as e:
+    import tkinter.messagebox as mb
+    mb.showerror("Lỗi hệ thống", f"Không thể tạo thư mục dữ liệu:\n{e}")
+
+# 3. Gán đường dẫn cố định
+BASE_DIR = APP_DATA_DIR
 DB_PATH = os.path.join(BASE_DIR, "vocab.db")
 CACHE_DIR = os.path.join(BASE_DIR, "image_cache")
 AUDIO_CACHE_DIR = os.path.join(BASE_DIR, "audio_cache")
+
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(AUDIO_CACHE_DIR, exist_ok=True)
+
+# 4. Tự động Copy dữ liệu cũ (Xử lý mượt cả khi chạy file .py và .exe)
+if getattr(sys, 'frozen', False):
+    LOCAL_DIR = os.path.dirname(sys.executable) # Thư mục chứa file .exe
+else:
+    LOCAL_DIR = os.path.dirname(os.path.abspath(__file__)) # Thư mục chứa file .py
+
+LOCAL_DB_PATH = os.path.join(LOCAL_DIR, "vocab.db")
+
+# Nếu có DB cũ mà DB mới chưa có thì copy sang
+if os.path.exists(LOCAL_DB_PATH) and not os.path.exists(DB_PATH):
+    try:
+        shutil.copy2(LOCAL_DB_PATH, DB_PATH)
+    except:
+        pass
+# ================================================================
 
 pygame.mixer.init()
 translator = GoogleTranslator(source='en', target='vi')
