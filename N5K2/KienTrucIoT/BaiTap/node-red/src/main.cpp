@@ -1,145 +1,81 @@
-#include <Arduino.h>
+#include <Arduino.h>         
+#include <WiFi.h>
+#include <PubSubClient.h>
 
-#define LED1    18
-#define LED2    19
-#define PIR_PIN 23
+// 1. THÔNG TIN MẠNG VÀ MÁY CHỦ (Đã được cập nhật)
+const char* ssid = "Wifi";                     // Tên WiFi của bạn
+const char* password = "1223334444";           // Mật khẩu WiFi của bạn
+const char* mqtt_server = "192.168.102.15";    // Địa chỉ IP máy tính Node-RED
 
-volatile bool special_mode = false;
-unsigned long special_mode_start = 0;
-unsigned long last_blink_normal = 0;
-unsigned long last_blink_special = 0;
-bool normal_state = false;
-int led1_count = 0;
-int led2_count = 0;
-bool led1_current = false;
-bool led2_current = false;
-int current_step = 0;
+WiFiClient espClient;
+PubSubClient client(espClient);
 
-void TaskBlinkControl(void *pvParameters);
-void TaskSensorMonitor(void *pvParameters);
+// 2. KHAI BÁO CHÂN CẮM ĐÈN LED
+const int led1 = 18;
+const int led2 = 19;
+const int led3 = 21;
+
+// Hàm kết nối WiFi
+void setup_wifi() {
+  Serial.begin(9600);
+  delay(10);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+}
+
+// Hàm nhận lệnh từ Node-RED để bật/tắt đèn
+void callback(char* topic, byte* payload, unsigned int length) {
+  // Đọc tin nhắn gửi tới
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  // Dùng số "1" để BẬT, "0" để TẮT
+  if (String(topic) == "dieukhien/led18") {
+    if (message == "1") digitalWrite(led1, HIGH);
+    if (message == "0") digitalWrite(led1, LOW);
+  }
+  if (String(topic) == "dieukhien/led19") {
+    if (message == "1") digitalWrite(led2, HIGH);
+    if (message == "0") digitalWrite(led2, LOW);
+  }
+  if (String(topic) == "dieukhien/led21") {
+    if (message == "1") digitalWrite(led3, HIGH);
+    if (message == "0") digitalWrite(led3, LOW);
+  }
+}
+
+// Hàm duy trì kết nối MQTT
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect("ESP32_NhaCuaToi")) {
+      // Đăng ký nhận tin nhắn từ 3 kênh (topic) này
+      client.subscribe("dieukhien/led18");
+      client.subscribe("dieukhien/led19");
+      client.subscribe("dieukhien/led21");
+    } else {
+      delay(5000);
+    }
+  }
+}
 
 void setup() {
-  Serial.begin(9600);
+  // Cài đặt các chân LED là đầu ra
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(led3, OUTPUT);
 
-  pinMode(LED1, OUTPUT);
-  pinMode(LED2, OUTPUT);
-  pinMode(PIR_PIN, INPUT);
-
-  xTaskCreate(
-    TaskBlinkControl,
-    "Task_BlinkControl",
-    2048,
-    NULL,
-    1,
-    NULL
-  );
-
-  xTaskCreate(
-    TaskSensorMonitor,
-    "Task_SensorMonitor",
-    2048,
-    NULL,
-    2,
-    NULL
-  );
+  setup_wifi();
+  client.setServer(mqtt_server, 1883); // 1883 là cổng mặc định của MQTT
+  client.setCallback(callback);
 }
 
 void loop() {
-  vTaskDelay(pdMS_TO_TICKS(1000));
-}
-
-void TaskBlinkControl(void *pvParameters) {
-  unsigned long current_time;
-  
-  for (;;) {
-    current_time = millis();
-    
-    if (special_mode == false) {
-      if (current_time - last_blink_normal >= 500) {
-        last_blink_normal = current_time;
-        normal_state = !normal_state;
-        digitalWrite(LED1, normal_state);
-        digitalWrite(LED2, normal_state);
-      }
-    }
-    else {
-      unsigned long elapsed = current_time - special_mode_start;
-      
-      if (elapsed >= 30000) {
-        special_mode = false;
-        digitalWrite(LED1, LOW);
-        digitalWrite(LED2, LOW);
-        normal_state = false;
-        last_blink_normal = current_time;
-        led1_count = 0;
-        led2_count = 0;
-        current_step = 0;
-        Serial.println("Tro lai che do binh thuong");
-      }
-      else {
-        if (current_time - last_blink_special >= 500) {
-          last_blink_special = current_time;
-          
-          if (current_step == 0) {
-            digitalWrite(LED1, HIGH);
-            digitalWrite(LED2, HIGH);
-            Serial.println("Buoc 1: LED1 ON, LED2 ON");
-            current_step = 1;
-          }
-          else if (current_step == 1) {
-            digitalWrite(LED1, LOW);
-            digitalWrite(LED2, LOW);
-            Serial.println("Buoc 2: LED1 OFF, LED2 OFF");
-            current_step = 2;
-          }
-          else if (current_step == 2) {
-            digitalWrite(LED1, LOW);
-            digitalWrite(LED2, HIGH);
-            Serial.println("Buoc 3: LED1 OFF, LED2 ON");
-            current_step = 3;
-          }
-          else if (current_step == 3) {
-            digitalWrite(LED1, LOW);
-            digitalWrite(LED2, LOW);
-            Serial.println("Buoc 4: LED1 OFF, LED2 OFF");
-            current_step = 0;
-          }
-        }
-      }
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(10));
+  if (!client.connected()) {
+    reconnect();
   }
+  client.loop(); // Giữ cho MQTT luôn chạy
 }
-
-void TaskSensorMonitor(void *pvParameters) {
-  bool last_motion = false;
-  
-  for (;;) {
-    bool motion = digitalRead(PIR_PIN);
-    
-    if (motion == HIGH && last_motion == LOW && special_mode == false) {
-      special_mode = true;
-      special_mode_start = millis();
-      last_blink_special = millis();
-      led1_count = 0;
-      led2_count = 0;
-      current_step = 0;
-      digitalWrite(LED1, LOW);
-      digitalWrite(LED2, LOW);
-      Serial.println("Phat hien chuyen dong - LED1 nhay 1 lan, LED2 nhay 2 lan trong 30s");
-    }
-    
-    last_motion = motion;
-    vTaskDelay(pdMS_TO_TICKS(50));
-  }
-}
-//Chế độ bình thường: LED1 và LED2 nháy cùng chu kỳ 0.5s
-//Khi có cảm biến:
-//Chu kỳ nháy 0.5s cho cả 2 LED
-//LED1 nháy 1 lần: Sáng 0.5s → Tắt 0.5s
-//LED2 nháy 2 lần: Sáng 0.5s → Tắt 0.5s → Sáng 0.5s → Tắt 0.5s
-//Lặp lại trong 30s
-//Sau 30s: Trở về chế độ bình thường
-
-//Led 1,2 cùng nháy chung chu kỳ 0.5s, khi có giá trị từ cảm biến , led 1 nháy 1s, led 2 nháy 2s, nháy trong vòng 30s và trở về ban đầu
