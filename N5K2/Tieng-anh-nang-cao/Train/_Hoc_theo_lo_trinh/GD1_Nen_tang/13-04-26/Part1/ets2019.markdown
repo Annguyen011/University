@@ -199,4 +199,35 @@
     D. A lamp has been set on top of a counter
 
 # Test 5
->1  A. 
+>1  A. A man is opening a drawer
+    B. A man is wiping a counter
+    C. A man is ordering a meal
+    D. A man is pouring a beverage
+
+>2  A. A bicycle has been loaded onto a truck
+    B. Cyclists are riding down a city street
+    C. Several cars are parked in a row
+    Một vài chiếc xe hơi đc đỗ thành hàng
+    D. A driver is getting out of a vehicle
+
+>3  A. A woman is hanging up a sign
+    B. Some customers are waiting in line
+    C. Some customers are paying for some merchandise
+    D. A woman is wearing a jacket
+
+>4  A. Some people are entering a building
+    B. Some people are holding on to a railing
+    C. Some people are crossing a road
+    D. Some people are descending some stair
+    Một vài người đang đi xuống bậc thang
+
+>5  A. A projector is being repositioned on a desk
+    B. Some printed materials are being distributed to a class
+    C. An audience is listening to a lecturer
+    D. Some people are organizing a workplace
+
+>6  A. A lamp has been attached on the wall
+    B. A door has been left open
+    C. An office is unoccupied
+    D. A keyboard is covered with file folders
+
