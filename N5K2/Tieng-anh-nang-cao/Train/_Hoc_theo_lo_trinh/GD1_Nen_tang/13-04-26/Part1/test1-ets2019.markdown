@@ -108,3 +108,95 @@
     D. One of the men is approaching a counter
     Một người đàn ông đang đi đến quầy
 
+# Test 3
+
+>1  A. He's looking in a file drawer
+    Anh ấy nhìn vào tủ tài liệu
+    B. He's printing some documents
+    Anh ấy in vài tài liệu
+    C. He's stacking some folders
+    Anh ấy chất đống bìa 
+    D. he's putting on his glasses
+    Anh ấy đeo kính lên
+
+>2  A. Some people are sitting in a car
+    Vài người ngồi trong xe
+    B. Some people are facing each other
+    Vài người đối mat với nhau
+    C. A woman is opening her handbag
+    Một người phụ nữ mở túi của họ
+    D. A man is removing his jacket
+    Một người đàn ông bỏ áo khoác ra
+
+>3  A. Clothing is hanging on racks
+    Quần áo đang được treo trên giá
+    B. Lights have been turned off the store
+    Đèn đang được tắt trong cửa hàng
+    C. A woman is folding a coat
+    Một người phụ nữ đang xếp quần áo
+    D. A woman is opening a garment bag
+    Một người phụ nữ đang mở túi quần áo
+
+>4  A. Some armchairs are occupied
+    Ghế bành đã có người
+    B. Books and magazines have been arranged on shelves
+    Sách và tạp chí đã được xếp lên kệ
+    C. A gates has been placed at the bottom of a stairway
+    Một cái cửa đã được đặt ở cuối thang cuốn
+    D. A painting has been left on the floor
+    Một bức vẽ được đặt trên sàn
+
+>5  A. A flag is being raised on a pole
+    Lá cờ đang được kéo lên trên tàu
+    B. A ship is approaching a pier
+    Một chiếc tàu đang tiến tới cầu
+    C. Some people are walking toward a boat
+    Một số người đang đi tới trước tàu
+    D. Some worker are sweeping a dock
+    Một số công nhân đang lau bến tàu
+
+>6  A. A man is putting up a metal barrier
+    Một người đàn ông đang đặt lên một cái rào chắn kim loại
+    B. Some people are boarding a bus
+    Một số người đang lên xe bus
+    C. A cart is being loaded with bricks
+    Một xe đẩy đang được chất bằng gạch
+    D. A wheelbarrow is being pushed at a work site
+    Một xe rùa đang được đẩy ở chỗ làm
+
+# Test 4
+>1  A. He's talking on the phone
+    B. He's folding a newspaper
+    C. He's writing on a form
+    D. He's leaving an office
+
+>2  A. One of the men is placing branches into a container
+    B. One of the men is planting a tree
+    C. The men are working near each other
+    D. The men are carrying a ladder
+
+>3  A. They're looking into a copy machine
+    B. They're posting notices on a board
+    C. They're putting some papers in a file
+    họ đang cho giấy vào tập hồ sơ
+    D. They're moving equipment out of a room
+
+>4  A. Bags of merchandise are on display
+    Túi đồ đang được trưng bày
+    B. A shoppong cart is being filled
+    C. The woman is putting on an apron
+    Người phụ nữ đang mặc một chiếc tạp dề
+    D. The woman is handing a bag to customer
+
+>5  A. A man is unpacking a suitcase
+    B. A musican is playing outdoor
+    C. Some park benches are empty
+    D. Some people are setting up a tent
+
+>6  A. Some artwork is being framed
+    B. A plant is hanging form the celling
+    C. Some chairs have been stacked againt a wall
+    D. A lamp has been set on top of a counter
+
+# Test 5
+>1  A. 
