@@ -264,151 +264,336 @@ class AutoPongGame(MiniGame):
 
         self.after_id = self.canvas.after(20, self.update)
 
-# --- Game 3: Hệ Mặt Trời (Cập nhật ĐẸP HƠN & CHI TIẾT) ---
 class SolarOrbitGame(MiniGame):
     def __init__(self, canvas, width, height):
         super().__init__(canvas, width, height)
         self.planets = []
+        self.moons = []         # Mặt trăng của các hành tinh
+        self.asteroids = []     # Vành đai tiểu hành tinh
+        self.stars = []
         self.reset()
 
     def reset(self):
         self.planets = [
-            {"r": 35, "speed": 0.05, "angle": 0, "size": 9, "color": "#E5E7E9", "detail": "sands"},  # Gần, vân cát
-            {"r": 62, "speed": 0.025, "angle": 45, "size": 14, "color": "#5DADE2", "detail": "clouds"}, # Giữa, mây xanh
-            {"r": 88, "speed": 0.012, "angle": 120, "size": 19, "color": "#AF7AC5", "detail": "rings"} # Xa, khí tím + bóng
+            {"r": 35, "speed": 0.06, "angle": 0, "size": 9, "color": "#D5D8DC",
+             "type": "rocky", "self_rot": 0},
+            {"r": 60, "speed": 0.03, "angle": 45, "size": 15, "color": "#2E86C1",
+             "type": "gas", "self_rot": 0},
+            {"r": 88, "speed": 0.015, "angle": 120, "size": 20, "color": "#AF7AC5",
+             "type": "ringed", "self_rot": 0},
+            {"r": 115, "speed": 0.008, "angle": 210, "size": 25, "color": "#E67E22",
+             "type": "jupiter", "self_rot": 0},
         ]
+        self.moons = []
+        # Mặt trăng cho hành tinh thứ 3 (ringed)
+        self.moons.append({"planet_idx": 2, "distance": 14, "size": 2.5, "speed": 0.08, "angle": 0, "color": "#BDC3C7"})
+        # Mặt trăng cho hành tinh thứ 4
+        self.moons.append({"planet_idx": 3, "distance": 18, "size": 3.5, "speed": 0.05, "angle": 45, "color": "#F1C40F"})
+        self.moons.append({"planet_idx": 3, "distance": 22, "size": 2.0, "speed": 0.04, "angle": 180, "color": "#BFC9CA"})
+
+        # Vành đai tiểu hành tinh giữa hành tinh 2 và 3
+        self.asteroids = []
+        for _ in range(80):
+            self.asteroids.append({
+                "r": 75 + random.randint(-3, 3),
+                "angle": random.uniform(0, 2 * math.pi),
+                "size": random.uniform(0.5, 1.2),
+                "speed": random.uniform(0.008, 0.02)
+            })
+        self.stars = [(random.randint(0, self.width), random.randint(0, self.height),
+                       random.uniform(0.5, 1.5)) for _ in range(50)]
 
     def update(self):
-        if not self.active: return
+        if not self.active:
+            return
         self.canvas.delete("all")
-        
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#040410", outline="")
 
-        for _ in range(5):
-            sx, sy = random.randint(0, self.width), random.randint(0, self.height)
-            self.canvas.create_oval(sx, sy, sx+random.randint(1,2), sy+2, fill="#FFFFFF", outline="")
+        # Nền vũ trụ
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#050510", outline="")
+
+        # Sao nền nhấp nháy
+        for sx, sy, br in self.stars:
+            pulse = 0.6 + 0.4 * math.sin(time.time() * 2 + sx * 0.1)
+            gray = int(200 * pulse * br)
+            color = "#%02x%02x%02x" % (gray, gray, gray)
+            self.canvas.create_oval(sx, sy, sx + 1.5, sy + 1.5, fill=color, outline="")
 
         cx, cy = self.width / 2, self.height / 2
-        # Mặt trời có quầng sáng
-        self.canvas.create_oval(cx-22, cy-22, cx+22, cy+22, fill="#F9E79F", outline="")
-        self.canvas.create_oval(cx-18, cy-18, cx+18, cy+18, fill="#F1C40F", outline="#F39C12", width=1)
 
-        for p in self.planets:
+        # === Mặt Trời ===
+        # Quầng ngoài
+        for i in range(3):
+            r_sun = 25 + i * 5
+            alpha = 0.4 - i * 0.1
+            fill_color = "#%02x%02x%02x" % (255, 200 - i * 20, 0)
+            self.canvas.create_oval(cx - r_sun, cy - r_sun, cx + r_sun, cy + r_sun,
+                                    fill=fill_color, outline="", stipple="gray25")
+        # Thân chính
+        self.canvas.create_oval(cx - 22, cy - 22, cx + 22, cy + 22, fill="#F9E79F", outline="")
+        self.canvas.create_oval(cx - 18, cy - 18, cx + 18, cy + 18, fill="#F1C40F", outline="#E67E22", width=1)
+        # Tia lửa mặt trời
+        for a in range(0, 360, 30):
+            rad = math.radians(a + time.time() * 10)
+            x1 = cx + 26 * math.cos(rad)
+            y1 = cy + 26 * math.sin(rad)
+            x2 = cx + 32 * math.cos(rad + 0.2)
+            y2 = cy + 32 * math.sin(rad + 0.2)
+            self.canvas.create_line(x1, y1, x2, y2, fill="#FFC300", width=2)
+
+        # Vẽ vành đai tiểu hành tinh (giữa hành tinh 2 và 3)
+        for ast in self.asteroids:
+            ast["angle"] += ast["speed"]
+            px = cx + ast["r"] * math.cos(ast["angle"])
+            py = cy + ast["r"] * math.sin(ast["angle"])
+            self.canvas.create_oval(px - ast["size"], py - ast["size"],
+                                    px + ast["size"], py + ast["size"],
+                                    fill="#BDC3C7", outline="")
+
+        # Vẽ các hành tinh
+        for idx, p in enumerate(self.planets):
             p["angle"] += p["speed"]
             px = cx + p["r"] * math.cos(p["angle"])
             py = cy + p["r"] * math.sin(p["angle"])
             s, c = p["size"], p["color"]
+            p["self_rot"] += 0.02  # tự quay
 
-            self.canvas.create_oval(cx-p["r"], cy-p["r"], cx+p["r"], cy+p["r"], outline="#1B2631", dash=(1, 5))
-            
-            # Vẽ Thân hành tinh cơ bản
-            self.canvas.create_oval(px-s/2, py-s/2, px+s/2, py+s/2, fill=c, outline="#212F3C")
+            # Quỹ đạo
+            self.canvas.create_oval(cx - p["r"], cy - p["r"],
+                                    cx + p["r"], cy + p["r"],
+                                    outline="#1B2631", dash=(2, 5))
 
-            # Vẽ chi tiết mượt bằng Polygon+smooth
-            if p["detail"] == "sands":
-                self.canvas.create_polygon(px-s/3, py+s/4, px+s/2, py-s/5, px+s/4, py+s/3, fill="#BDBDBD", smooth=True, outline="")
-            elif p["detail"] == "clouds":
-                self.canvas.create_polygon(px-s/2, py-s/4, px, py-s/2, px+s/3, py, px-s/4, py+s/2, fill="#FFFFFF", smooth=True, outline="", stipple="gray25")
-            elif p["detail"] == "rings":
-                # Vẽ bóng tối một bên
-                self.canvas.create_arc(px-s/2, py-s/2, px+s/2, py+s/2, start=p["angle"]*50, extent=180, fill="#1A1A1A", outline="", stipple="gray50")
-                # Vẽ vành đai mờ
-                rx, ry = p["r"]*math.cos(p["angle"]), p["r"]*math.sin(p["angle"])
-                self.canvas.create_oval(cx+rx-s, cy+ry-s/3, cx+rx+s, cy+ry+s/3, outline="#8E44AD", width=1, dash=(2,2))
+            # Vẽ hành tinh
+            self.canvas.create_oval(px - s, py - s, px + s, py + s, fill=c, outline="#2C3E50", width=1)
+
+            # Chi tiết bề mặt theo loại
+            if p["type"] == "rocky":
+                # Miệng núi lửa
+                for _ in range(4):
+                    a_crat = random.uniform(0, 2 * math.pi) + p["self_rot"]
+                    cr = random.uniform(s * 0.15, s * 0.3)
+                    cx_c = px + (s - cr) * 0.5 * math.cos(a_crat)
+                    cy_c = py + (s - cr) * 0.5 * math.sin(a_crat)
+                    self.canvas.create_oval(cx_c - cr, cy_c - cr, cx_c + cr, cy_c + cr,
+                                            fill="#95A5A6", outline="#7F8C8D")
+            elif p["type"] == "gas":
+                # Dải mây
+                for i in range(-2, 3):
+                    self.canvas.create_line(px - s * 0.9, py + i * s * 0.25,
+                                            px + s * 0.9, py + i * s * 0.25,
+                                            fill="#1B4F72", width=2, stipple="gray25")
+            elif p["type"] == "ringed":
+                # Vành đai nghiêng
+                ring_angle = p["angle"] * 0.8
+                dx = math.cos(ring_angle)
+                dy = math.sin(ring_angle)
+                for w in [1, 2, 3]:
+                    self.canvas.create_oval(px + dx * (s + w * 3) - s * 0.6,
+                                            py + dy * (s + w * 3) * 0.3 - s * 0.3,
+                                            px + dx * (s + w * 3) + s * 0.6,
+                                            py + dy * (s + w * 3) * 0.3 + s * 0.3,
+                                            outline="#8E44AD", width=1, dash=(3, 3))
+                # Bề mặt khí
+                self.canvas.create_arc(px - s, py - s, px + s, py + s,
+                                       start=p["self_rot"] * 50, extent=120,
+                                       fill="#D2B4DE", outline="", stipple="gray25")
+            elif p["type"] == "jupiter":
+                # Dải màu
+                stripes_colors = ["#D35400", "#F39C12", "#E67E22", "#A04000"]
+                for i, stripe_c in enumerate(stripes_colors):
+                    self.canvas.create_rectangle(px - s, py - s + i * s * 0.35,
+                                                 px + s, py - s + (i + 1) * s * 0.35,
+                                                 fill=stripe_c, outline="", stipple="gray25")
+                # Bão đỏ
+                self.canvas.create_oval(px + s * 0.3, py - s * 0.2,
+                                        px + s * 0.7, py + s * 0.2,
+                                        fill="#E74C3C", outline="")
+
+        # Vẽ mặt trăng
+        for moon in self.moons:
+            p = self.planets[moon["planet_idx"]]
+            moon["angle"] += moon["speed"]
+            mx = cx + p["r"] * math.cos(p["angle"]) + moon["distance"] * math.cos(moon["angle"])
+            my = cy + p["r"] * math.sin(p["angle"]) + moon["distance"] * math.sin(moon["angle"])
+            self.canvas.create_oval(mx - moon["size"], my - moon["size"],
+                                    mx + moon["size"], my + moon["size"],
+                                    fill=moon["color"], outline="#FFFFFF")
 
         self.after_id = self.canvas.after(30, self.update)
-
-
-# --- Game 4: Bể Cá Thư Giãn (Cập nhật ĐẸP & MƯỢT HƠN) ---
 class AquariumGame(MiniGame):
     def __init__(self, canvas, width, height):
         super().__init__(canvas, width, height)
         self.fishes = []
         self.bubbles = []
+        self.seaweeds = []      # vị trí rong biển
+        self.light_rays = []    # tia nắng
         self.reset()
 
     def reset(self):
         self.fishes = []
-        colors = ["#FF7F50", "#F4D03F", "#5DADE2", "#F369B4", "#82E0AA", "#E67E22"]
-        for _ in range(5):
+        colors = ["#FF7F50", "#F4D03F", "#5DADE2", "#F369B4", "#82E0AA", "#E67E22",
+                  "#C39BD3", "#48C9B0", "#F5B041", "#EC7063"]
+        for _ in range(6):
             self.fishes.append({
-                "x": random.randint(50, self.width-50),
-                "y": random.randint(50, self.height-70),
-                "vx": random.uniform(0.7, 1.6) * random.choice([-1, 1]),
+                "x": random.randint(50, self.width - 50),
+                "y": random.randint(30, self.height - 80),
+                "vx": random.uniform(0.5, 1.4) * random.choice([-1, 1]),
+                "vy": random.uniform(-0.2, 0.2),
                 "color": random.choice(colors),
-                "size": random.randint(18, 28),
-                "wiggle": random.uniform(0, 6)
+                "size": random.randint(18, 30),
+                "wiggle": random.uniform(0, 6),
+                "type": random.choice(["normal", "flat", "long"]),
+                "bubble_timer": random.randint(0, 30)
             })
         self.bubbles = []
+        # Rong biển mọc cố định ở đáy
+        self.seaweeds = [{"x": x, "ph": random.randint(30, 60)} for x in range(40, self.width, 50)]
+        # Tia nắng
+        self.light_rays = [{"x": x, "alpha": random.uniform(0.3, 0.7)} for x in range(20, self.width, 30)]
+        self.anim_time = 0
 
     def update(self):
-        if not self.active: return
+        if not self.active:
+            return
         self.canvas.delete("all")
-        
-        # Nước biển xanh trong
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#0C4C8A", outline="")
-        # Cát đáy biển mịn
-        self.canvas.create_rectangle(0, self.height-25, self.width, self.height, fill="#E3CF96", outline="")
-        
-        # Rong biển mượt
-        for px, ph in [(45, 65), (75, 45), (225, 75), (255, 55)]:
-            points = []
-            for i in range(ph // 6):
-                curve = math.sin(time.time()*2.5 + px/12 + i/2) * 3.5
-                points.extend([px + curve, self.height - 20 - i*6])
-            self.canvas.create_line(points, fill="#196F3D", width=3, smooth=True)
+        self.anim_time += 0.05
 
-        # Bọt nước nổi
-        if random.random() < 0.18:
-            self.bubbles.append({"x": random.randint(20, self.width-20), "y": self.height-25, "r": random.randint(2, 5)})
-        
+        # Nền xanh đại dương
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#0A3D6B", outline="")
+        # Lớp nước sâu có gradient giả
+        for i in range(5):
+            alpha = abs(math.sin(self.anim_time * 0.4 + i))
+            shade = "#%02x%02x%02x" % (10, 50 + int(alpha * 20), 100 + int(alpha * 30))
+            self.canvas.create_rectangle(0, self.height // 5 * i, self.width, self.height // 5 * (i + 1),
+                                         fill=shade, outline="", stipple="gray25")
+
+        # Đáy cát
+        self.canvas.create_rectangle(0, self.height - 25, self.width, self.height,
+                                     fill="#C2A36B", outline="")
+        for _ in range(20):
+            sx, sy = random.randint(0, self.width), self.height - 25 + random.randint(0, 20)
+            self.canvas.create_oval(sx, sy, sx + random.randint(2, 4), sy + 2,
+                                    fill="#D4B87A", outline="")
+
+        # Tia nắng từ mặt nước
+        for ray in self.light_rays:
+            rx = ray["x"] + math.sin(self.anim_time + ray["x"]) * 10
+            self.canvas.create_polygon(rx, 0, rx + 10, 0, rx + 30, self.height - 30,
+                                       rx - 20, self.height - 30,
+                                       fill="#FFFF99", outline="", stipple="gray12")
+
+        # Rong biển mềm mại uốn lượn
+        for sw in self.seaweeds:
+            points = []
+            for i in range(sw["ph"] // 5):
+                offset = math.sin(self.anim_time * 2 + sw["x"] * 0.1 + i * 0.4) * (4 + i * 0.3)
+                points.extend([sw["x"] + offset, self.height - 25 - i * 5])
+            self.canvas.create_line(points, fill="#1E8449", width=3, smooth=True)
+
+        # Cập nhật cá
+        for f in self.fishes:
+            # Chuyển động ngang + dọc nhẹ
+            f["x"] += f["vx"]
+            f["y"] += f["vy"] + math.sin(self.anim_time * 3 + f["wiggle"]) * 0.15
+            if f["x"] > self.width - 30 or f["x"] < 30:
+                f["vx"] = -f["vx"]
+            if f["y"] < 20 or f["y"] > self.height - 50:
+                f["vy"] = -f["vy"]
+            f["wiggle"] += 0.3
+
+            dir = 1 if f["vx"] > 0 else -1
+            s, c = f["size"], f["color"]
+            tw = math.sin(f["wiggle"]) * 5.0      # đuôi vẫy
+            bw = math.cos(f["wiggle"] * 1.3) * 3.0 # vây bụng
+
+            # --- Vẽ đuôi (tùy loại cá) ---
+            tx = f["x"] - dir * s * 0.8
+            if f["type"] == "flat":
+                # Đuôi xòe ngang
+                self.canvas.create_polygon(
+                    tx, f["y"],
+                    tx - dir * s * 0.8, f["y"] - s * 0.4 + tw,
+                    tx - dir * s * 0.6, f["y"],
+                    tx - dir * s * 0.8, f["y"] + s * 0.4 - tw,
+                    fill=c, outline="#1C2833", width=1, smooth=True
+                )
+            elif f["type"] == "long":
+                # Đuôi dài, mảnh
+                self.canvas.create_polygon(
+                    tx, f["y"],
+                    tx - dir * s * 1.2, f["y"] - s * 0.2 + tw,
+                    tx - dir * s * 1.0, f["y"],
+                    tx - dir * s * 1.2, f["y"] + s * 0.2 - tw,
+                    fill=c, outline="#1C2833", width=1, smooth=True
+                )
+            else:  # normal
+                self.canvas.create_polygon(
+                    tx, f["y"],
+                    tx - dir * s * 0.6, f["y"] - s * 0.45 + tw,
+                    tx - dir * s * 0.5, f["y"],
+                    tx - dir * s * 0.6, f["y"] + s * 0.45 - tw,
+                    fill=c, outline="#1C2833", width=1, smooth=True
+                )
+
+            # Vây lưng & vây bụng mờ
+            self.canvas.create_polygon(
+                f["x"] - dir * s * 0.2, f["y"] - s * 0.45,
+                f["x"] - dir * s * 0.6, f["y"] - s * 0.8 + bw,
+                f["x"] - dir * s * 0.9, f["y"] - s * 0.3,
+                fill="#1C2833", outline="", stipple="gray25", smooth=True
+            )
+            self.canvas.create_polygon(
+                f["x"] - dir * s * 0.2, f["y"] + s * 0.45,
+                f["x"] - dir * s * 0.6, f["y"] + s * 0.8 - bw,
+                f["x"] - dir * s * 0.9, f["y"] + s * 0.3,
+                fill="#1C2833", outline="", stipple="gray25", smooth=True
+            )
+
+            # Thân cá (hình oval chính)
+            body_w = s * (1.6 if f["type"] == "flat" else 1.0)
+            body_h = s * (0.6 if f["type"] == "flat" else 0.9 if f["type"] == "long" else 1.0)
+            self.canvas.create_oval(f["x"] - body_w, f["y"] - body_h * 0.6,
+                                    f["x"] + body_w, f["y"] + body_h * 0.6,
+                                    fill=c, outline="#1C2833", width=1)
+
+            # Vân sáng trên thân
+            self.canvas.create_polygon(
+                f["x"] - body_w * 0.3, f["y"] - body_h * 0.2,
+                f["x"] + body_w * 0.4, f["y"],
+                f["x"] - body_w * 0.3, f["y"] + body_h * 0.2,
+                fill="#FFFFFF", outline="", stipple="gray25", smooth=True
+            )
+
+            # Mắt + mang
+            ex = f["x"] + dir * body_w * 0.6
+            mx = f["x"] + dir * body_w * 0.3
+            self.canvas.create_arc(mx - body_w * 0.15, f["y"] - body_h * 0.35,
+                                   mx + body_w * 0.15, f["y"] + body_h * 0.35,
+                                   start=120 * dir, extent=120, style=tk.ARC,
+                                   outline="#1C2833", width=1)
+            self.canvas.create_oval(ex - 4, f["y"] - 4, ex + 4, f["y"] + 4,
+                                    fill="white", outline="black")
+            self.canvas.create_oval(ex - 1.5, f["y"] - 2, ex + 2, f["y"] + 1.5,
+                                    fill="black", outline="")
+
+            # Bong bóng từ cá (ngẫu nhiên)
+            f["bubble_timer"] -= 1
+            if f["bubble_timer"] <= 0:
+                f["bubble_timer"] = random.randint(25, 70)
+                bx = f["x"] + dir * body_w * 0.7
+                by = f["y"] - 2
+                self.bubbles.append({"x": bx, "y": by, "r": random.uniform(2, 5)})
+
+        # Xử lý bọt nước chung
         for b in self.bubbles[:]:
-            b["y"] -= random.uniform(1.3, 3.2)
-            b["x"] += math.sin(time.time()*6 + b["x"]) * 0.6
-            self.canvas.create_oval(b["x"]-b["r"], b["y"]-b["r"], b["x"]+b["r"], b["y"]+b["r"], outline="#AED6F1", width=1)
+            b["y"] -= random.uniform(1.0, 2.8)
+            b["x"] += math.sin(self.anim_time * 5 + b["x"] * 0.1) * 0.5
+            self.canvas.create_oval(b["x"] - b["r"], b["y"] - b["r"],
+                                    b["x"] + b["r"], b["y"] + b["r"],
+                                    outline="#AED6F1", width=1)
             if b["y"] < -10:
                 self.bubbles.remove(b)
 
-        # Đàn cá (Vẽ mượt, chi tiết chuẩn)
-        for f in self.fishes:
-            f["x"] += f["vx"]
-            f["wiggle"] += 0.35
-            if f["x"] > self.width - 30 or f["x"] < 30:
-                f["vx"] = -f["vx"]
-            
-            dir = 1 if f["vx"] > 0 else -1
-            s, c = f["size"], f["color"]
-            tw = math.sin(f["wiggle"]) * 4.5 # tail wiggle
-            
-            tx = f["x"] - dir*s*0.8
-            # 1. Vẽ Đuôi cá mềm
-            self.canvas.create_polygon(
-                tx, f["y"],
-                tx - dir*s*0.6, f["y"] - s/2 + tw,
-                tx - dir*s*0.5, f["y"],
-                tx - dir*s*0.6, f["y"] + s/2 - tw,
-                fill=c, outline="#1C2833", width=1, smooth=True
-            )
-            
-            # 2. Vẽ Vây mờ bằng Poly+smooth+stipple
-            self.canvas.create_polygon(f["x"]-dir*s/4, f["y"]-s/3, f["x"]-dir*s/2, f["y"]-s/1.1, f["x"]-dir*s*0.8, f["y"]-s/4, fill="#1C2833", smooth=True, outline="", stipple="gray25")
-            self.canvas.create_polygon(f["x"]-dir*s/4, f["y"]+s/3, f["x"]-dir*s/2, f["y"]+s/1.1, f["x"]-dir*s*0.8, f["y"]+s/4, fill="#1C2833", smooth=True, outline="", stipple="gray25")
-
-            # 3. Vẽ Thân cá chuẩn
-            self.canvas.create_oval(f["x"] - s, f["y"] - s/2.4, f["x"] + s, f["y"] + s/2.4, fill=c, outline="#1C2833", width=1)
-            
-            # 4. Thêm vân đa giác mờ lên thân
-            self.canvas.create_polygon(f["x"], f["y"]-s/4, f["x"]+dir*s/2, f["y"], f["x"], f["y"]+s/4, fill="#FFFFFF", smooth=True, outline="", stipple="gray25")
-
-            # 5. Mắt và mang
-            ex, mx = f["x"] + dir*s*0.5, f["x"] + dir*s*0.2
-            self.canvas.create_arc(mx-s/5, f["y"]-s/4, mx+s/5, f["y"]+s/4, start=120*dir, extent=120, style=tk.ARC, outline="#1C2833")
-            self.canvas.create_oval(ex-4, f["y"]-4, ex+4, f["y"]+4, fill="white", outline="black")
-            self.canvas.create_oval(ex-1, f["y"]-2, ex+2, f["y"]+1, fill="black", outline="")
-
         self.after_id = self.canvas.after(30, self.update)
-
-
 # --- Game 5 MỚI: Tuyết Rơi thư giãn (Snowfall) ---
 class SnowfallGame(MiniGame):
     def __init__(self, canvas, width, height):
