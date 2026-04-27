@@ -1,8 +1,8 @@
 ﻿import tkinter as tk
 from tkinter import ttk
 import random
-from tkinter import font as tkFont
 import math
+import time
 
 # ===================== CÁC MINIGAME (AUTO-PLAY) =====================
 class MiniGame:
@@ -14,6 +14,7 @@ class MiniGame:
         self.after_id = None
 
     def start(self):
+        self.reset()
         self.active = True
         self.update()
 
@@ -23,577 +24,655 @@ class MiniGame:
             self.canvas.after_cancel(self.after_id)
             self.after_id = None
 
+    def pause(self):
+        self.active = False
+        if self.after_id:
+            self.canvas.after_cancel(self.after_id)
+            self.after_id = None
+
+    def resume(self):
+        if not self.active:
+            self.active = True
+            self.update()
+
+    def reset(self):
+        raise NotImplementedError
+
     def update(self):
         raise NotImplementedError
 
-# --- Game 1: Chú mèo học bài chạy qua sách (Dino style) ---
-class CatBookRunner(MiniGame):
+# --- Game 1: Dino Runner (Vẫn giữ AI nhảy tốt) ---
+class DinoRunnerGame(MiniGame):
     def __init__(self, canvas, width, height):
         super().__init__(canvas, width, height)
         self.ground_y = height - 30
-        self.cat = {"x": 50, "y": self.ground_y - 40, "w": 32, "h": 40, "vy": 0, "jumping": False}
+        self.dino = {"x": 40, "y": self.ground_y - 40, "w": 40, "h": 43, "vy": 0, "jumping": False}
         self.obstacles = []
-        self.speed = 4
+        self.speed = 5
         self.spawn_timer = 0
-        self.spawn_delay = 70
+        self.spawn_delay = 60
         self.frame = 0
         self.score = 0
+        self.ground_dots = []
 
-    def start(self):
-        self.cat["y"] = self.ground_y - self.cat["h"]
-        self.cat["vy"] = 0
-        self.cat["jumping"] = False
+    def reset(self):
+        self.dino["y"] = self.ground_y - self.dino["h"]
+        self.dino["vy"] = 0
+        self.dino["jumping"] = False
         self.obstacles.clear()
-        self.speed = 4
+        self.speed = 5
         self.spawn_timer = 0
         self.score = 0
+        self.frame = 0
+        self.ground_dots = [{"x": random.randint(0, self.width), "y": random.randint(self.ground_y + 2, self.ground_y + 10)} for _ in range(15)]
+
+    def start(self):
+        self.reset()
         super().start()
 
     def update(self):
         if not self.active:
             return
         self.canvas.delete("all")
-        # Nền
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#E8F4FD", outline="")
-        self.canvas.create_line(0, self.ground_y, self.width, self.ground_y, fill="#B0C4DE", width=2)
-        # Mây
-        self.canvas.create_oval(80, 15, 130, 40, fill="white", outline="")
-        self.canvas.create_oval(300, 10, 340, 35, fill="white", outline="")
+        
+        bg_color = "#F7F7F7"
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill=bg_color, outline="")
+        self.canvas.create_line(0, self.ground_y, self.width, self.ground_y, fill="#535353", width=1)
+        
+        for dot in self.ground_dots:
+            dot["x"] -= self.speed
+            if dot["x"] < 0:
+                dot["x"] = self.width + random.randint(0, 50)
+            self.canvas.create_rectangle(dot["x"], dot["y"], dot["x"]+2, dot["y"]+2, fill="#535353", outline="")
 
-        # Sinh & di chuyển chướng ngại
+        self.draw_cloud(80, 30)
+        self.draw_cloud(220, 15)
+
         self.spawn_timer += 1
         if self.spawn_timer >= self.spawn_delay:
             self.spawn_obstacle()
-            self.spawn_timer = 0
-            self.speed = min(9, self.speed + 0.05)
+            self.spawn_timer = random.randint(-20, 10) 
+            self.speed = min(12, self.speed + 0.05)
 
         for obs in self.obstacles[:]:
             obs["x"] -= self.speed
             if obs["x"] + obs["w"] < 0:
                 self.obstacles.remove(obs)
-                self.score += 1
+                self.score += 10
 
-        # Nhảy
-        if self.cat["jumping"]:
-            self.cat["vy"] += 0.6
-            self.cat["y"] += self.cat["vy"]
-            if self.cat["y"] >= self.ground_y - self.cat["h"]:
-                self.cat["y"] = self.ground_y - self.cat["h"]
-                self.cat["vy"] = 0
-                self.cat["jumping"] = False
+        if self.dino["jumping"]:
+            self.dino["vy"] += 0.9  
+            self.dino["y"] += self.dino["vy"]
+            if self.dino["y"] >= self.ground_y - self.dino["h"]:
+                self.dino["y"] = self.ground_y - self.dino["h"]
+                self.dino["vy"] = 0
+                self.dino["jumping"] = False
 
-        # Tự động nhảy
-        if not self.cat["jumping"]:
+        if not self.dino["jumping"]:
             for obs in self.obstacles:
-                dist = obs["x"] - (self.cat["x"] + self.cat["w"])
-                if 0 < dist < 60:
-                    self.cat["vy"] = -10
-                    self.cat["jumping"] = True
-                    break
+                if obs["x"] + obs["w"] > self.dino["x"]:
+                    dist = obs["x"] - (self.dino["x"] + self.dino["w"])
+                    jump_dist = 35 + self.speed * 7 
+                    if dist < jump_dist: 
+                        self.dino["vy"] = -14
+                        self.dino["jumping"] = True
+                    break 
 
-        # Va chạm
-        cat_bbox = (self.cat["x"], self.cat["y"], self.cat["x"]+self.cat["w"], self.cat["y"]+self.cat["h"])
+        dino_bbox = (self.dino["x"]+5, self.dino["y"]+5, self.dino["x"]+self.dino["w"]-5, self.dino["y"]+self.dino["h"]-5)
         for obs in self.obstacles:
             obs_bbox = (obs["x"], obs["y"], obs["x"]+obs["w"], obs["y"]+obs["h"])
-            if self.rect_collide(cat_bbox, obs_bbox):
+            if self.rect_collide(dino_bbox, obs_bbox):
                 self.game_over()
                 return
 
-        # Vẽ mèo
-        self.draw_cat()
-        # Vẽ chướng ngại (sách vui nhộn)
         self.draw_obstacles()
-        # Điểm
-        self.canvas.create_text(self.width-70, 15, text=f"⭐ {self.score}",
-                                font=("Arial", 12, "bold"), fill="#FF8C00")
+        self.draw_dino()
+        
+        self.canvas.create_text(self.width-40, 20, text=f"{self.score:05d}", font=("Courier", 12, "bold"), fill="#535353")
         self.after_id = self.canvas.after(20, self.update)
 
-    def spawn_obstacle(self):
-        types = ["closed", "open", "tall"]
-        if types[0] == "closed":
-            w, h = 18, 35
-        elif types[1] == "open":
-            w, h = 38, 24
-        else:
-            w, h = 14, 45
-        self.obstacles.append({"x": self.width, "y": self.ground_y - h,
-                               "w": w, "h": h, "type": random.choice(types)})
+    def draw_cloud(self, cx, cy):
+        color = "#E0E0E0"
+        self.canvas.create_rectangle(cx, cy, cx+30, cy+10, fill=color, outline="")
+        self.canvas.create_rectangle(cx+5, cy-5, cx+25, cy+15, fill=color, outline="")
+        self.canvas.create_rectangle(cx+10, cy-10, cx+20, cy+20, fill=color, outline="")
 
-    def draw_cat(self):
-        x, y, w, h = self.cat["x"], self.cat["y"], self.cat["w"], self.cat["h"]
-        # Thân mèo (cam)
-        self.canvas.create_oval(x, y+10, x+w, y+h, fill="#FFA500", outline="#FF8C00", width=2)
-        # Đầu
-        self.canvas.create_oval(x-2, y, x+w-4, y+20, fill="#FFA500", outline="#FF8C00", width=2)
-        # Tai
-        self.canvas.create_polygon(x, y+2, x+6, y-8, x+12, y+2, fill="#FFA500", outline="#FF8C00")
-        self.canvas.create_polygon(x+14, y+2, x+20, y-8, x+26, y+2, fill="#FFA500", outline="#FF8C00")
-        # Mắt
-        self.canvas.create_oval(x+6, y+8, x+12, y+14, fill="white")
-        self.canvas.create_oval(x+16, y+8, x+22, y+14, fill="white")
-        self.canvas.create_oval(x+9, y+10, x+11, y+12, fill="black")
-        self.canvas.create_oval(x+19, y+10, x+21, y+12, fill="black")
-        # Râu
-        self.canvas.create_line(x-2, y+12, x+4, y+12, fill="#333", width=1)
-        self.canvas.create_line(x-2, y+16, x+4, y+16, fill="#333", width=1)
-        self.canvas.create_line(x+26, y+12, x+30, y+12, fill="#333", width=1)
-        self.canvas.create_line(x+26, y+16, x+30, y+16, fill="#333", width=1)
-        # Mũi
-        self.canvas.create_oval(x+12, y+14, x+14, y+16, fill="pink")
-        # Chân
-        if not self.cat["jumping"]:
-            self.frame = (self.frame + 1) % 2
-            if self.frame == 0:
-                self.canvas.create_line(x+8, y+h, x+4, y+h+12, fill="#FF8C00", width=3)
-                self.canvas.create_line(x+20, y+h, x+24, y+h+8, fill="#FF8C00", width=3)
+    def spawn_obstacle(self):
+        types = ["small1", "small2", "big"]
+        choice = random.choice(types)
+        if choice == "small1": w, h = 15, 33
+        elif choice == "small2": w, h = 30, 33 
+        else: w, h = 23, 46 
+        self.obstacles.append({"x": self.width, "y": self.ground_y - h, "w": w, "h": h, "type": choice})
+
+    def draw_dino(self):
+        x, y = self.dino["x"], self.dino["y"]
+        c = "#535353"
+        self.canvas.create_rectangle(x+20, y, x+38, y+16, fill=c, outline="")
+        self.canvas.create_rectangle(x+22, y+2, x+26, y+6, fill="#F7F7F7", outline="")
+        self.canvas.create_rectangle(x+20, y+16, x+28, y+20, fill=c, outline="")
+        self.canvas.create_rectangle(x+30, y+16, x+38, y+18, fill=c, outline="")
+        self.canvas.create_rectangle(x+10, y+16, x+26, y+32, fill=c, outline="")
+        self.canvas.create_rectangle(x+6, y+20, x+10, y+28, fill=c, outline="")
+        self.canvas.create_rectangle(x+2, y+24, x+6, y+28, fill=c, outline="")
+        self.canvas.create_rectangle(x, y+18, x+4, y+24, fill=c, outline="")
+        self.canvas.create_rectangle(x+26, y+18, x+32, y+22, fill=c, outline="")
+        self.canvas.create_rectangle(x+30, y+22, x+32, y+24, fill=c, outline="")
+
+        if not self.dino["jumping"]:
+            self.frame = (self.frame + 1) % 10
+            if self.frame < 5:
+                self.canvas.create_rectangle(x+10, y+32, x+14, y+38, fill=c, outline="")
+                self.canvas.create_rectangle(x+18, y+32, x+22, y+42, fill=c, outline="")
+                self.canvas.create_rectangle(x+22, y+40, x+26, y+42, fill=c, outline="")
             else:
-                self.canvas.create_line(x+8, y+h, x+12, y+h+8, fill="#FF8C00", width=3)
-                self.canvas.create_line(x+20, y+h, x+16, y+h+12, fill="#FF8C00", width=3)
+                self.canvas.create_rectangle(x+10, y+32, x+14, y+42, fill=c, outline="")
+                self.canvas.create_rectangle(x+14, y+40, x+18, y+42, fill=c, outline="")
+                self.canvas.create_rectangle(x+18, y+32, x+22, y+38, fill=c, outline="")
         else:
-            self.canvas.create_line(x+10, y+h, x+14, y+h+5, fill="#FF8C00", width=2)
-            self.canvas.create_line(x+18, y+h, x+14, y+h+5, fill="#FF8C00", width=2)
+            self.canvas.create_rectangle(x+10, y+32, x+14, y+36, fill=c, outline="")
+            self.canvas.create_rectangle(x+20, y+32, x+24, y+36, fill=c, outline="")
 
     def draw_obstacles(self):
+        c = "#535353"
         for obs in self.obstacles:
             x, y, w, h = obs["x"], obs["y"], obs["w"], obs["h"]
-            if obs["type"] == "closed":
-                self.canvas.create_rectangle(x, y, x+w, y+h, fill="#D2691E", outline="#8B4513", width=2)
-                self.canvas.create_text(x+w/2, y+h/2, text="📕", font=("Arial", h//2), anchor="center")
-            elif obs["type"] == "open":
-                self.canvas.create_polygon(x, y+h//2, x+12, y, x+w, y, x+w-12, y+h//2,
-                                         fill="#B8860B", outline="#8B6508", width=2)
-                self.canvas.create_text(x+w/2, y+h//2-2, text="📖", font=("Arial", h//2), anchor="center")
-            else:  # tall
-                self.canvas.create_rectangle(x, y, x+w, y+h, fill="#4682B4", outline="#2F4F4F", width=2)
-                self.canvas.create_text(x+w/2, y+h/2, text="📚", font=("Arial", h//2), anchor="center")
+            if obs["type"] == "small1" or obs["type"] == "small2":
+                self.canvas.create_rectangle(x+w//2-3, y, x+w//2+3, y+h, fill=c, outline="")
+                self.canvas.create_rectangle(x, y+10, x+w//2-3, y+14, fill=c, outline="")
+                self.canvas.create_rectangle(x, y+4, x+4, y+14, fill=c, outline="")
+                self.canvas.create_rectangle(x+w//2+3, y+14, x+w, y+18, fill=c, outline="")
+                self.canvas.create_rectangle(x+w-4, y+6, x+w, y+18, fill=c, outline="")
+                if obs["type"] == "small2":
+                    offset = 15
+                    self.canvas.create_rectangle(x+offset+w//2-3, y+4, x+offset+w//2+3, y+h, fill=c, outline="")
+                    self.canvas.create_rectangle(x+offset, y+14, x+offset+w//2-3, y+18, fill=c, outline="")
+                    self.canvas.create_rectangle(x+offset, y+8, x+offset+4, y+18, fill=c, outline="")
+            elif obs["type"] == "big":
+                self.canvas.create_rectangle(x+8, y, x+16, y+h, fill=c, outline="")
+                self.canvas.create_rectangle(x, y+15, x+8, y+20, fill=c, outline="")
+                self.canvas.create_rectangle(x, y+5, x+6, y+20, fill=c, outline="")
+                self.canvas.create_rectangle(x+16, y+20, x+24, y+25, fill=c, outline="")
+                self.canvas.create_rectangle(x+18, y+10, x+24, y+25, fill=c, outline="")
 
     def game_over(self):
         self.active = False
         if self.after_id:
             self.canvas.after_cancel(self.after_id)
-        self.canvas.create_text(self.width/2, self.height/2-15, text="😿 Ú òa!",
-                                font=("Arial", 16, "bold"), fill="#DC143C")
-        self.canvas.create_text(self.width/2, self.height/2+15, text="Tự chạy lại sau 2s...",
-                                font=("Arial", 10), fill="#555")
+        self.canvas.create_text(self.width/2, self.height/2-20, text="G A M E  O V E R", font=("Courier", 14, "bold"), fill="#535353")
+        self.canvas.create_text(self.width/2, self.height/2+10, text="Tự chạy lại sau 2s...", font=("Arial", 9), fill="#535353")
         self.canvas.after(2000, self.start)
 
     def rect_collide(self, r1, r2):
         return (r1[0] < r2[2] and r1[2] > r2[0] and r1[1] < r2[3] and r1[3] > r2[1])
 
-# --- Game 2: Những quyển sách bay (thư giãn) ---
-class FloatingBooksGame(MiniGame):
+
+# --- Game 2: Bóng Bàn Tự Chơi ---
+class AutoPongGame(MiniGame):
     def __init__(self, canvas, width, height):
         super().__init__(canvas, width, height)
-        self.books = []
+        self.paddle_w = 8
+        self.paddle_h = 40
+        self.ball_r = 5
+        self.reset()
 
-    def start(self):
-        self.books = []
-        for _ in range(8):
-            self.books.append(self.new_book(random.randint(0, self.width), random.randint(0, self.height)))
-        super().start()
+    def reset(self):
+        self.ball_x = self.width / 2
+        self.ball_y = self.height / 2
+        self.ball_vx = random.choice([-5, 5])
+        self.ball_vy = random.choice([-4, 4])
+        self.pad1_y = self.height / 2 - self.paddle_h / 2
+        self.pad2_y = self.height / 2 - self.paddle_h / 2
 
-    def new_book(self, x, y):
+    def update(self):
+        if not self.active: return
+        self.canvas.delete("all")
+        
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#111111", outline="")
+        self.canvas.create_line(self.width/2, 0, self.width/2, self.height, fill="#333333", dash=(4, 4))
+
+        self.ball_x += self.ball_vx
+        self.ball_y += self.ball_vy
+
+        if self.ball_y - self.ball_r <= 0 or self.ball_y + self.ball_r >= self.height:
+            self.ball_vy = -self.ball_vy
+
+        if self.ball_vx < 0:
+            target1 = self.ball_y - self.paddle_h/2
+            target2 = self.height/2 - self.paddle_h/2 
+        else:
+            target2 = self.ball_y - self.paddle_h/2
+            target1 = self.height/2 - self.paddle_h/2 
+
+        self.pad1_y += (target1 - self.pad1_y) * 0.15
+        self.pad2_y += (target2 - self.pad2_y) * 0.15
+
+        self.pad1_y = max(0, min(self.height - self.paddle_h, self.pad1_y))
+        self.pad2_y = max(0, min(self.height - self.paddle_h, self.pad2_y))
+
+        if self.ball_x - self.ball_r <= 15 + self.paddle_w and self.pad1_y <= self.ball_y <= self.pad1_y + self.paddle_h:
+            self.ball_x = 15 + self.paddle_w + self.ball_r
+            self.ball_vx = -self.ball_vx
+        
+        if self.ball_x + self.ball_r >= self.width - 15 - self.paddle_w and self.pad2_y <= self.ball_y <= self.pad2_y + self.paddle_h:
+            self.ball_x = self.width - 15 - self.paddle_w - self.ball_r
+            self.ball_vx = -self.ball_vx
+
+        self.canvas.create_rectangle(15, self.pad1_y, 15+self.paddle_w, self.pad1_y+self.paddle_h, fill="#00FF00", outline="")
+        self.canvas.create_rectangle(self.width-15-self.paddle_w, self.pad2_y, self.width-15, self.pad2_y+self.paddle_h, fill="#FF00FF", outline="")
+        self.canvas.create_oval(self.ball_x-self.ball_r, self.ball_y-self.ball_r, self.ball_x+self.ball_r, self.ball_y+self.ball_r, fill="#FFFFFF", outline="")
+
+        self.after_id = self.canvas.after(20, self.update)
+
+# --- Game 3: Hệ Mặt Trời (Cập nhật ĐẸP HƠN & CHI TIẾT) ---
+class SolarOrbitGame(MiniGame):
+    def __init__(self, canvas, width, height):
+        super().__init__(canvas, width, height)
+        self.planets = []
+        self.reset()
+
+    def reset(self):
+        self.planets = [
+            {"r": 35, "speed": 0.05, "angle": 0, "size": 9, "color": "#E5E7E9", "detail": "sands"},  # Gần, vân cát
+            {"r": 62, "speed": 0.025, "angle": 45, "size": 14, "color": "#5DADE2", "detail": "clouds"}, # Giữa, mây xanh
+            {"r": 88, "speed": 0.012, "angle": 120, "size": 19, "color": "#AF7AC5", "detail": "rings"} # Xa, khí tím + bóng
+        ]
+
+    def update(self):
+        if not self.active: return
+        self.canvas.delete("all")
+        
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#040410", outline="")
+
+        for _ in range(5):
+            sx, sy = random.randint(0, self.width), random.randint(0, self.height)
+            self.canvas.create_oval(sx, sy, sx+random.randint(1,2), sy+2, fill="#FFFFFF", outline="")
+
+        cx, cy = self.width / 2, self.height / 2
+        # Mặt trời có quầng sáng
+        self.canvas.create_oval(cx-22, cy-22, cx+22, cy+22, fill="#F9E79F", outline="")
+        self.canvas.create_oval(cx-18, cy-18, cx+18, cy+18, fill="#F1C40F", outline="#F39C12", width=1)
+
+        for p in self.planets:
+            p["angle"] += p["speed"]
+            px = cx + p["r"] * math.cos(p["angle"])
+            py = cy + p["r"] * math.sin(p["angle"])
+            s, c = p["size"], p["color"]
+
+            self.canvas.create_oval(cx-p["r"], cy-p["r"], cx+p["r"], cy+p["r"], outline="#1B2631", dash=(1, 5))
+            
+            # Vẽ Thân hành tinh cơ bản
+            self.canvas.create_oval(px-s/2, py-s/2, px+s/2, py+s/2, fill=c, outline="#212F3C")
+
+            # Vẽ chi tiết mượt bằng Polygon+smooth
+            if p["detail"] == "sands":
+                self.canvas.create_polygon(px-s/3, py+s/4, px+s/2, py-s/5, px+s/4, py+s/3, fill="#BDBDBD", smooth=True, outline="")
+            elif p["detail"] == "clouds":
+                self.canvas.create_polygon(px-s/2, py-s/4, px, py-s/2, px+s/3, py, px-s/4, py+s/2, fill="#FFFFFF", smooth=True, outline="", stipple="gray25")
+            elif p["detail"] == "rings":
+                # Vẽ bóng tối một bên
+                self.canvas.create_arc(px-s/2, py-s/2, px+s/2, py+s/2, start=p["angle"]*50, extent=180, fill="#1A1A1A", outline="", stipple="gray50")
+                # Vẽ vành đai mờ
+                rx, ry = p["r"]*math.cos(p["angle"]), p["r"]*math.sin(p["angle"])
+                self.canvas.create_oval(cx+rx-s, cy+ry-s/3, cx+rx+s, cy+ry+s/3, outline="#8E44AD", width=1, dash=(2,2))
+
+        self.after_id = self.canvas.after(30, self.update)
+
+
+# --- Game 4: Bể Cá Thư Giãn (Cập nhật ĐẸP & MƯỢT HƠN) ---
+class AquariumGame(MiniGame):
+    def __init__(self, canvas, width, height):
+        super().__init__(canvas, width, height)
+        self.fishes = []
+        self.bubbles = []
+        self.reset()
+
+    def reset(self):
+        self.fishes = []
+        colors = ["#FF7F50", "#F4D03F", "#5DADE2", "#F369B4", "#82E0AA", "#E67E22"]
+        for _ in range(5):
+            self.fishes.append({
+                "x": random.randint(50, self.width-50),
+                "y": random.randint(50, self.height-70),
+                "vx": random.uniform(0.7, 1.6) * random.choice([-1, 1]),
+                "color": random.choice(colors),
+                "size": random.randint(18, 28),
+                "wiggle": random.uniform(0, 6)
+            })
+        self.bubbles = []
+
+    def update(self):
+        if not self.active: return
+        self.canvas.delete("all")
+        
+        # Nước biển xanh trong
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#0C4C8A", outline="")
+        # Cát đáy biển mịn
+        self.canvas.create_rectangle(0, self.height-25, self.width, self.height, fill="#E3CF96", outline="")
+        
+        # Rong biển mượt
+        for px, ph in [(45, 65), (75, 45), (225, 75), (255, 55)]:
+            points = []
+            for i in range(ph // 6):
+                curve = math.sin(time.time()*2.5 + px/12 + i/2) * 3.5
+                points.extend([px + curve, self.height - 20 - i*6])
+            self.canvas.create_line(points, fill="#196F3D", width=3, smooth=True)
+
+        # Bọt nước nổi
+        if random.random() < 0.18:
+            self.bubbles.append({"x": random.randint(20, self.width-20), "y": self.height-25, "r": random.randint(2, 5)})
+        
+        for b in self.bubbles[:]:
+            b["y"] -= random.uniform(1.3, 3.2)
+            b["x"] += math.sin(time.time()*6 + b["x"]) * 0.6
+            self.canvas.create_oval(b["x"]-b["r"], b["y"]-b["r"], b["x"]+b["r"], b["y"]+b["r"], outline="#AED6F1", width=1)
+            if b["y"] < -10:
+                self.bubbles.remove(b)
+
+        # Đàn cá (Vẽ mượt, chi tiết chuẩn)
+        for f in self.fishes:
+            f["x"] += f["vx"]
+            f["wiggle"] += 0.35
+            if f["x"] > self.width - 30 or f["x"] < 30:
+                f["vx"] = -f["vx"]
+            
+            dir = 1 if f["vx"] > 0 else -1
+            s, c = f["size"], f["color"]
+            tw = math.sin(f["wiggle"]) * 4.5 # tail wiggle
+            
+            tx = f["x"] - dir*s*0.8
+            # 1. Vẽ Đuôi cá mềm
+            self.canvas.create_polygon(
+                tx, f["y"],
+                tx - dir*s*0.6, f["y"] - s/2 + tw,
+                tx - dir*s*0.5, f["y"],
+                tx - dir*s*0.6, f["y"] + s/2 - tw,
+                fill=c, outline="#1C2833", width=1, smooth=True
+            )
+            
+            # 2. Vẽ Vây mờ bằng Poly+smooth+stipple
+            self.canvas.create_polygon(f["x"]-dir*s/4, f["y"]-s/3, f["x"]-dir*s/2, f["y"]-s/1.1, f["x"]-dir*s*0.8, f["y"]-s/4, fill="#1C2833", smooth=True, outline="", stipple="gray25")
+            self.canvas.create_polygon(f["x"]-dir*s/4, f["y"]+s/3, f["x"]-dir*s/2, f["y"]+s/1.1, f["x"]-dir*s*0.8, f["y"]+s/4, fill="#1C2833", smooth=True, outline="", stipple="gray25")
+
+            # 3. Vẽ Thân cá chuẩn
+            self.canvas.create_oval(f["x"] - s, f["y"] - s/2.4, f["x"] + s, f["y"] + s/2.4, fill=c, outline="#1C2833", width=1)
+            
+            # 4. Thêm vân đa giác mờ lên thân
+            self.canvas.create_polygon(f["x"], f["y"]-s/4, f["x"]+dir*s/2, f["y"], f["x"], f["y"]+s/4, fill="#FFFFFF", smooth=True, outline="", stipple="gray25")
+
+            # 5. Mắt và mang
+            ex, mx = f["x"] + dir*s*0.5, f["x"] + dir*s*0.2
+            self.canvas.create_arc(mx-s/5, f["y"]-s/4, mx+s/5, f["y"]+s/4, start=120*dir, extent=120, style=tk.ARC, outline="#1C2833")
+            self.canvas.create_oval(ex-4, f["y"]-4, ex+4, f["y"]+4, fill="white", outline="black")
+            self.canvas.create_oval(ex-1, f["y"]-2, ex+2, f["y"]+1, fill="black", outline="")
+
+        self.after_id = self.canvas.after(30, self.update)
+
+
+# --- Game 5 MỚI: Tuyết Rơi thư giãn (Snowfall) ---
+class SnowfallGame(MiniGame):
+    def __init__(self, canvas, width, height):
+        super().__init__(canvas, width, height)
+        self.flakes = []
+        self.reset()
+
+    def reset(self):
+        self.flakes = []
+        for _ in range(50):
+            self.flakes.append(self.create_flake(True))
+
+    def create_flake(self, random_y=False):
         return {
-            "x": x, "y": y,
-            "vx": random.uniform(-0.8, 0.8),
-            "vy": random.uniform(-1.0, -0.3),
-            "size": random.randint(14, 22),
-            "color": random.choice(["#FF6347", "#3CB371", "#6A5ACD", "#FF8C00", "#20B2AA"]),
-            "rotation": random.uniform(-20, 20)
+            "x": random.randint(0, self.width),
+            "y": random.randint(0, self.height) if random_y else -10,
+            "vy": random.uniform(1, 3),
+            "r": random.uniform(1.5, 4),
+            "drift": random.uniform(-0.5, 0.5)
         }
 
     def update(self):
-        if not self.active:
-            return
+        if not self.active: return
         self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#FFF5E1", outline="")
-        # Vẽ vài ngôi sao nhỏ
-        for _ in range(10):
-            sx = random.randint(0, self.width)
-            sy = random.randint(0, self.height)
-            self.canvas.create_oval(sx, sy, sx+3, sy+3, fill="#FFD700", outline="")
+        
+        # Nền trời đông tối
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#0A0F1E", outline="")
 
-        for book in self.books:
-            book["x"] += book["vx"]
-            book["y"] += book["vy"]
-            # Bọc lại khi ra khỏi khung
-            if book["x"] < -30:
-                book["x"] = self.width + 30
-            if book["x"] > self.width + 30:
-                book["x"] = -30
-            if book["y"] < -30:
-                book["y"] = self.height + 30
-            if book["y"] > self.height + 30:
-                book["y"] = -30
-            book["rotation"] += random.uniform(-1, 1)
+        # Tuyết rơi
+        for f in self.flakes:
+            f["y"] += f["vy"]
+            f["x"] += f["drift"] + math.sin(time.time() + f["vy"]) * 0.3
+            
+            self.canvas.create_oval(f["x"]-f["r"], f["y"]-f["r"], f["x"]+f["r"], f["y"]+f["r"], fill="#FFFFFF", outline="")
+            
+            # Reset khi tuyết rơi xuống đáy
+            if f["y"] > self.height + 10:
+                f["y"] = -10
+                f["x"] = random.randint(0, self.width)
 
-            # Vẽ quyển sách nhỏ với emoji
-            self.canvas.create_text(book["x"], book["y"],
-                                    text="📘" if random.random()>0.5 else "📗",
-                                    font=("Arial", book["size"]), angle=book["rotation"])
+        self.after_id = self.canvas.after(30, self.update)
 
-        self.after_id = self.canvas.after(40, self.update)
 
-# --- Game 3: Cốc cà phê nhảy múa (vui mắt) ---
-class DancingCupGame(MiniGame):
-    def __init__(self, canvas, width, height):
-        super().__init__(canvas, width, height)
-        self.cup_x = width//2
-        self.cup_y = 60
-        self.vy = 2
-        self.vx = 3
-        self.angle = 0
-
-    def start(self):
-        self.cup_x = self.width//2
-        self.cup_y = 60
-        self.vy = 2
-        self.vx = 3
-        self.angle = 0
-        super().start()
-
-    def update(self):
-        if not self.active:
-            return
-        self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#FDF5E6", outline="")
-        # Nền hạt cà phê
-        for _ in range(6):
-            bx = random.randint(0, self.width)
-            by = random.randint(0, self.height)
-            self.canvas.create_text(bx, by, text="☕", font=("Arial", 10), fill="#D2B48C")
-
-        self.cup_x += self.vx
-        self.cup_y += self.vy
-        self.vy += 0.25  # trọng lực nhẹ
-        # Bounce
-        if self.cup_y + 25 >= self.height:
-            self.cup_y = self.height - 25
-            self.vy = -abs(self.vy) * 0.8
-        if self.cup_x - 20 <= 0:
-            self.cup_x = 20
-            self.vx = abs(self.vx) * 0.9
-        elif self.cup_x + 20 >= self.width:
-            self.cup_x = self.width - 20
-            self.vx = -abs(self.vx) * 0.9
-
-        self.angle += 5
-        # Vẽ cốc cà phê xoay
-        self.canvas.create_text(self.cup_x, self.cup_y, text="☕", font=("Arial", 30),
-                                angle=self.angle, fill="#6F4E37")
-        self.canvas.create_text(self.width-50, 15, text="☕ Nhảy điệu",
-                                font=("Arial", 9, "italic"), fill="#8B4513")
-        self.after_id = self.canvas.after(25, self.update)
-
-# =========================== ỨNG DỤNG ĐỒNG HỒ HỌC TẬP ===========================
+# =========================== ỨNG DỤNG ĐỒNG HỒ ===========================
 class StudyTimer:
     def __init__(self, root):
         self.root = root
-        self.root.title("⏳ Study Timer - Pomodoro & Mini Games")
-        self.root.geometry("900x560")  # Tăng kích thước
-        self.root.configure(bg="#0F1419")
-        self.root.resizable(True, True)
-        self.root.minsize(800, 500)
+        self.root.title("⏳ Study Timer - Giao diện Đẹp")
+        self.root.geometry("780x500")
+        
+        self.bg_color = "#121212"       
+        self.frame_bg = "#1E1E1E"       
+        
+        # Cập nhật tông màu DỊU HƠN để mitigate răng cưa
+        self.green_accent = "#20B2AA"   # Xanh ngọc sẫm (LightSeaGreen) dịu mắt
+        self.red_accent = "#CD5C5C"     # Đỏ sẫm nhạt (IndianRed)
+        
+        self.text_color = "#FFFFFF"     
+        self.sub_color = "#AAAAAA"      
+        
+        self.root.configure(bg=self.bg_color)
+        self.root.resizable(False, False)
 
-        # Biến trạng thái
         self.study_time = 25 * 60
         self.short_break = 5 * 60
         self.long_break = 15 * 60
+        
         self.current_time_left = self.study_time
+        self.end_time = 0
+        
         self.is_running = False
         self.is_paused = False
         self.is_study = True
         self.pomodoro_count = 0
         self.after_id = None
 
-        # Màu sắc cải tiến
-        self.bg_color = "#0F1419"
-        self.frame_bg = "#1A1F2E"
-        self.frame_light = "#242A3E"
-        self.green_accent = "#00D9FF"
-        self.green_dark = "#00A3CC"
-        self.red_accent = "#FF6B9D"
-        self.red_dark = "#CC5580"
-        self.text_color = "#FFFFFF"
-        self.sub_color = "#A0A8C0"
-        self.border_color = "#2A3452"
-
-        # Font
-        self.font_title = tkFont.Font(family="Segoe UI", size=16, weight="bold")
-        self.font_large = tkFont.Font(family="Segoe UI", size=12, weight="bold")
-        self.font_normal = tkFont.Font(family="Segoe UI", size=10)
-        self.font_small = tkFont.Font(family="Segoe UI", size=9)
-        self.font_timer = tkFont.Font(family="Courier New", size=36, weight="bold")
-
         self.current_game = None
         self.game_map = {}
 
         self.build_ui()
-        self.switch_game("cat_book_runner")  # game mặc định
+        self.switch_game("dino_runner")
         self.update_timer_display()
 
     def build_ui(self):
-        # --- Container chính ---
-        main_container = tk.Frame(self.root, bg=self.bg_color)
-        main_container.pack(fill=tk.BOTH, expand=True)
+        left_frame = tk.Frame(self.root, bg=self.bg_color, width=400, height=500)
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=15, pady=15)
+        left_frame.pack_propagate(False)
 
-        # --- Khung trái (đồng hồ + điều khiển) ---
-        left_frame = tk.Frame(main_container, bg=self.bg_color)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=20)
+        tk.Label(left_frame, text="⏳ STUDY TIMER", font=("Segoe UI", 20, "bold"), fg=self.text_color, bg=self.bg_color).pack(pady=(5,2))
+        tk.Label(left_frame, text="Phương pháp Pomodoro", font=("Segoe UI", 10), fg=self.sub_color, bg=self.bg_color).pack(pady=(0, 10))
 
-        # Header với gradient effect
-        header = tk.Frame(left_frame, bg=self.bg_color)
-        header.pack(fill=tk.X, pady=(0, 15))
-        tk.Label(header, text="⏳ STUDY TIMER", font=self.font_title,
-                 fg=self.green_accent, bg=self.bg_color).pack(anchor="w")
-        tk.Label(header, text="Pomodoro Technique for Focus", font=self.font_small,
-                 fg=self.sub_color, bg=self.bg_color).pack(anchor="w", pady=(2, 0))
-
-        # Canvas đồng hồ tròn - cải thiện
         canvas_frame = tk.Frame(left_frame, bg=self.bg_color)
-        canvas_frame.pack(pady=15)
+        canvas_frame.pack()
+        self.canvas = tk.Canvas(canvas_frame, width=240, height=240, bg=self.bg_color, highlightthickness=0)
+        self.canvas.pack()
+        self.canvas.create_oval(20, 20, 220, 220, outline="#2A2A2A", width=12)
+        # Thanh progress, mặc định màu xanh dịu
+        self.progress_arc = self.canvas.create_arc(20, 20, 220, 220, start=90, extent=-360, outline=self.green_accent, width=12, style=tk.ARC)
         
-        # Background cho canvas
-        bg_canvas = tk.Canvas(canvas_frame, width=240, height=240,
-                              bg=self.frame_light, highlightthickness=0,
-                              relief=tk.FLAT)
-        bg_canvas.pack()
-        bg_canvas.create_oval(5, 5, 235, 235, outline=self.border_color, width=1)
-        
-        self.canvas = tk.Canvas(canvas_frame, width=240, height=240,
-                                bg=self.frame_light, highlightthickness=0)
-        self.canvas.pack(pady=(0, 0), in_=canvas_frame, before=bg_canvas)
-        
-        # Vẽ vòng tròn ngoài
-        self.canvas.create_oval(20, 20, 220, 220, outline=self.border_color, width=2)
-        
-        # Progress arc
-        self.progress_arc = self.canvas.create_arc(20, 20, 220, 220,
-                                                   start=90, extent=0,
-                                                   outline=self.green_accent,
-                                                   width=16, style=tk.ARC)
-        self.timer_text = self.canvas.create_text(120, 100, text="25:00",
-                                                  font=self.font_timer,
-                                                  fill=self.text_color)
-        self.status_text = self.canvas.create_text(120, 145, text="HỌC TẬP",
-                                                   font=self.font_large,
-                                                   fill=self.green_accent)
-        self.count_text = self.canvas.create_text(120, 170, text="🍅 x 0",
-                                                  font=self.font_normal,
-                                                  fill=self.sub_color)
+        self.timer_text = self.canvas.create_text(120, 100, text="25:00", font=("Segoe UI", 40, "bold"), fill=self.text_color)
+        self.status_text = self.canvas.create_text(120, 145, text="HỌC TẬP", font=("Segoe UI", 12, "bold"), fill=self.green_accent)
+        self.count_text = self.canvas.create_text(120, 175, text="🍅 x 0", font=("Segoe UI", 11), fill=self.sub_color)
 
-        # Dòng thông báo
-        self.notif_label = tk.Label(left_frame, text="", font=self.font_small,
-                                    fg=self.green_accent, bg=self.bg_color, wraplength=300)
-        self.notif_label.pack(pady=10)
+        self.notif_label = tk.Label(left_frame, text="", font=("Segoe UI", 10, "italic"), fg="#FFD700", bg=self.bg_color)
+        self.notif_label.pack(pady=5)
 
-        # Nút điều khiển - cải thiện styling
         btn_frame = tk.Frame(left_frame, bg=self.bg_color)
-        btn_frame.pack(pady=15)
+        btn_frame.pack(pady=5)
         
-        self.start_pause_btn = self.create_button(btn_frame, "▶ BẮT ĐẦU",
-                                                   self.green_accent, "#0F1419",
-                                                   self.start_pause)
-        self.start_pause_btn.grid(row=0, column=0, padx=8, sticky="ew")
+        self.start_pause_btn = tk.Button(btn_frame, text="▶ BẮT ĐẦU", font=("Segoe UI", 11, "bold"), bg=self.green_accent, fg="#000000", activebackground="#32CD32", relief=tk.FLAT, bd=0, width=12, pady=5, cursor="hand2", command=self.start_pause)
+        self.start_pause_btn.grid(row=0, column=0, padx=5)
         
-        self.reset_btn = self.create_button(btn_frame, "↺ ĐẶT LẠI",
-                                            self.sub_color, "#0F1419",
-                                            self.reset)
-        self.reset_btn.grid(row=0, column=1, padx=8, sticky="ew")
+        self.reset_btn = tk.Button(btn_frame, text="↺ ĐẶT LẠI", font=("Segoe UI", 11, "bold"), bg="#333333", fg=self.text_color, activebackground="#555555", relief=tk.FLAT, bd=0, width=10, pady=5, cursor="hand2", command=self.reset)
+        self.reset_btn.grid(row=0, column=1, padx=5)
         
-        self.skip_btn = self.create_button(btn_frame, "⏭ BỎ QUA",
-                                           self.red_accent, "#0F1419",
-                                           self.skip)
-        self.skip_btn.grid(row=0, column=2, padx=8, sticky="ew")
-        
-        btn_frame.columnconfigure(0, weight=1)
-        btn_frame.columnconfigure(1, weight=1)
-        btn_frame.columnconfigure(2, weight=1)
+        self.skip_btn = tk.Button(btn_frame, text="⏭ BỎ QUA", font=("Segoe UI", 11, "bold"), bg=self.red_accent, fg="#FFFFFF", activebackground="#FF6347", relief=tk.FLAT, bd=0, width=10, pady=5, cursor="hand2", command=self.skip)
+        self.skip_btn.grid(row=0, column=2, padx=5)
 
-        # Frame tùy chỉnh thời gian - cải thiện
-        setting_frame = tk.Frame(left_frame, bg=self.frame_light,
-                                 highlightbackground=self.border_color,
-                                 highlightthickness=1, relief=tk.FLAT)
-        setting_frame.pack(pady=15, ipadx=15, ipady=12, fill=tk.X)
+        setting_frame = tk.Frame(left_frame, bg=self.frame_bg)
+        setting_frame.pack(pady=15, fill=tk.X, padx=10)
         
-        tk.Label(setting_frame, text="⚙️ THỜI GIAN (phút)", font=self.font_large,
-                 fg=self.green_accent, bg=self.frame_light).pack(pady=(0, 10))
-
-        fields = [("📚 Học:", "study", 25), ("☕ Nghỉ ngắn:", "short_break", 5),
-                  ("😴 Nghỉ dài:", "long_break", 15)]
+        fields = [("📚 Học:", "study", 25), ("☕ Nghỉ ngắn:", "short_break", 5), ("😴 Nghỉ dài:", "long_break", 15)]
         
-        for label_text, attr, default in fields:
-            row = tk.Frame(setting_frame, bg=self.frame_light)
-            row.pack(pady=5, fill=tk.X)
-            tk.Label(row, text=label_text, font=self.font_normal,
-                     fg=self.text_color, bg=self.frame_light, width=14, anchor="w").pack(side=tk.LEFT)
-            
-            entry = tk.Entry(row, font=self.font_normal, bg="#1A1F2E", fg=self.green_accent,
-                             insertbackground=self.green_accent, relief=tk.FLAT, width=5,
-                             justify=tk.CENTER, bd=1, highlightbackground=self.border_color,
-                             highlightthickness=1)
+        for i, (label_text, attr, default) in enumerate(fields):
+            tk.Label(setting_frame, text=label_text, font=("Segoe UI", 10), fg=self.sub_color, bg=self.frame_bg).grid(row=0, column=i*2, padx=(10, 2), pady=10)
+            entry = tk.Entry(setting_frame, font=("Segoe UI", 10, "bold"), bg="#333333", fg=self.text_color, relief=tk.FLAT, width=4, justify=tk.CENTER)
             entry.insert(0, str(default))
-            entry.pack(side=tk.LEFT, padx=4)
+            entry.grid(row=0, column=i*2+1, padx=(0, 10))
             setattr(self, f"{attr}_entry", entry)
 
-        self.apply_btn = self.create_button(setting_frame, "✓ ÁP DỤNG",
-                                            self.green_accent, "#0F1419",
-                                            self.apply_settings)
-        self.apply_btn.pack(pady=(10, 0), fill=tk.X, padx=5)
+        self.apply_btn = tk.Button(setting_frame, text="✓ LƯU", font=("Segoe UI", 9, "bold"), bg="#333333", fg=self.text_color, relief=tk.FLAT, command=self.apply_settings, cursor="hand2")
+        self.apply_btn.grid(row=1, column=0, columnspan=6, pady=(0, 10), ipadx=20)
 
-        # --- Khung phải (game) ---
-        right_frame = tk.Frame(main_container, bg=self.frame_light,
-                               highlightbackground=self.border_color,
-                               highlightthickness=1, relief=tk.FLAT)
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(0, 20), pady=20)
+        right_frame = tk.Frame(self.root, bg=self.frame_bg, width=340, height=500)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(0,15), pady=15)
+        right_frame.pack_propagate(False)
 
-        # Header game
-        game_header = tk.Frame(right_frame, bg=self.frame_light)
-        game_header.pack(fill=tk.X, padx=15, pady=(15, 10))
-        tk.Label(game_header, text="🎮 MINI GAME", font=self.font_large,
-                 fg=self.green_accent, bg=self.frame_light).pack(anchor="w")
+        tk.Label(right_frame, text="🎮 CHILL MINI GAME", font=("Segoe UI", 13, "bold"), fg=self.text_color, bg=self.frame_bg).pack(pady=(15, 5))
 
-        # Combobox chọn game
-        game_select = tk.Frame(right_frame, bg=self.frame_light)
-        game_select.pack(pady=(0, 10), padx=15, fill=tk.X)
-        tk.Label(game_select, text="Chọn game:", font=self.font_normal,
-                 fg=self.sub_color, bg=self.frame_light).pack(side=tk.LEFT, padx=(0, 8))
+        game_select = tk.Frame(right_frame, bg=self.frame_bg)
+        game_select.pack(pady=5)
         
-        self.game_var = tk.StringVar(value="cat_book_runner")
+        self.game_var = tk.StringVar(value="dino_runner")
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure('TCombobox', fieldbackground="#1A1F2E", background="#1A1F2E")
         
-        game_combo = ttk.Combobox(game_select, textvariable=self.game_var,
-                                  state="readonly", width=20, font=self.font_normal)
-        game_combo['values'] = ("cat_book_runner", "floating_books", "dancing_cup")
+        game_combo = ttk.Combobox(game_select, textvariable=self.game_var, state="readonly", width=18, font=("Segoe UI", 10))
+        # ---> ĐÃ THÊM TUYẾT RƠI VÀO DANH SÁCH <---
+        game_combo['values'] = ("dino_runner", "auto_pong", "solar_orbit", "aquarium", "snowfall")
         game_combo.current(0)
-        game_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        game_combo.pack()
         game_combo.bind("<<ComboboxSelected>>", lambda e: self.switch_game(self.game_var.get()))
 
-        # Canvas game - cải thiện
-        canvas_container = tk.Frame(right_frame, bg=self.frame_light)
-        canvas_container.pack(pady=15, padx=15, fill=tk.BOTH, expand=True)
-        
-        self.game_canvas = tk.Canvas(canvas_container, width=340, height=280,
-                                     bg="#F5F5DC", highlightbackground=self.green_accent,
-                                     highlightthickness=2, relief=tk.FLAT)
-        self.game_canvas.pack(fill=tk.BOTH, expand=True)
+        self.game_canvas = tk.Canvas(right_frame, width=300, height=200, bg="#F7F7F7", highlightthickness=2, highlightbackground="#333333")
+        self.game_canvas.pack(pady=15)
 
-        # Chú thích
-        tk.Label(right_frame, text="Game tự chơi để bạn thư giãn 👀",
-                 font=self.font_small, fg=self.sub_color, bg=self.frame_light).pack(pady=(0, 10))
-
-    def create_button(self, parent, text, fg_color, bg_color, command):
-        """Tạo button với styling cải thiện"""
-        btn = tk.Button(parent, text=text, font=self.font_normal,
-                       fg=bg_color, bg=fg_color, activeforeground=bg_color,
-                       activebackground=fg_color,
-                       relief=tk.FLAT, bd=0, padx=12, pady=8, cursor="hand2",
-                       command=command, highlightthickness=0)
-        # Thêm border effect
-        btn.config(borderwidth=2, relief=tk.RIDGE, bg=fg_color)
-        return btn
+        tk.Label(right_frame, text="Nhìn game tự chơi để mắt được nghỉ ngơi nhé 👀", font=("Segoe UI", 9, "italic"), fg=self.sub_color, bg=self.frame_bg).pack()
 
     def init_game(self, game_key):
         if self.current_game:
             self.current_game.stop()
-        w, h = 340, 280
-        if game_key == "cat_book_runner":
-            game = CatBookRunner(self.game_canvas, w, h)
-        elif game_key == "floating_books":
-            game = FloatingBooksGame(self.game_canvas, w, h)
-        elif game_key == "dancing_cup":
-            game = DancingCupGame(self.game_canvas, w, h)
-        else:
-            return
+        w, h = 300, 200
+        if game_key == "dino_runner": game = DinoRunnerGame(self.game_canvas, w, h)
+        elif game_key == "auto_pong": game = AutoPongGame(self.game_canvas, w, h)
+        elif game_key == "solar_orbit": game = SolarOrbitGame(self.game_canvas, w, h)
+        elif game_key == "aquarium": game = AquariumGame(self.game_canvas, w, h)
+        elif game_key == "snowfall": game = SnowfallGame(self.game_canvas, w, h)
+        else: return
         self.game_map[game_key] = game
         self.current_game = game
         if self.is_running and not self.is_paused and self.is_study:
             self.current_game.start()
-        else:
-            self.current_game.stop()
 
     def switch_game(self, game_key):
         self.init_game(game_key)
 
-    # ================== ĐỒNG HỒ & VÒNG TRÒN ==================
     def draw_progress(self):
         total = self.study_time if self.is_study else self.short_break
-        extent = 360 * (1 - self.current_time_left / total) if total > 0 else 0
-        self.canvas.delete(self.progress_arc)
+        extent = -(360 * (self.current_time_left / total)) if total > 0 else 0
         color = self.green_accent if self.is_study else self.red_accent
-        self.progress_arc = self.canvas.create_arc(20, 20, 220, 220,
-                                                   start=90, extent=extent,
-                                                   outline=color, width=16, style=tk.ARC)
-        self.canvas.create_oval(20, 20, 220, 220, outline=self.border_color, width=2)
+        self.canvas.itemconfig(self.progress_arc, extent=extent, outline=color)
 
     def update_timer_display(self):
-        mins, secs = divmod(self.current_time_left, 60)
+        # Dùng ceil để làm tròn giây lên khi hiển thị số
+        current_secs = int(math.ceil(self.current_time_left))
+        mins, secs = divmod(current_secs, 60)
         self.canvas.itemconfig(self.timer_text, text=f"{mins:02d}:{secs:02d}")
+        
         status = "HỌC TẬP" if self.is_study else "NGHỈ NGƠI"
         color = self.green_accent if self.is_study else self.red_accent
+        
         self.canvas.itemconfig(self.status_text, text=status, fill=color)
         self.canvas.itemconfig(self.count_text, text=f"🍅 x {self.pomodoro_count}")
         self.draw_progress()
 
     def countdown(self):
-        if self.is_running and not self.is_paused and self.current_time_left > 0:
-            self.current_time_left -= 1
+        if self.is_running and not self.is_paused:
+            # Cập nhật liên tục mỗi 50ms để progress bar mượt
+            self.current_time_left = max(0, self.end_time - time.time())
             self.update_timer_display()
-            self.after_id = self.root.after(1000, self.countdown)
-        elif self.current_time_left == 0:
-            self.timer_finished()
+            if self.current_time_left > 0:
+                # Chạy lại sau 50ms (20 frame/giây)
+                self.after_id = self.root.after(50, self.countdown)
+            else:
+                self.timer_finished()
 
     def timer_finished(self):
         self.is_running = False
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#0F1419")
+        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000")
         if self.current_game:
-            self.current_game.stop()
+            self.current_game.stop() 
 
         if self.is_study:
             self.pomodoro_count += 1
             self.update_timer_display()
             if self.pomodoro_count % 4 == 0:
                 self.current_time_left = self.long_break
-                msg = "🎉 4 Pomodoro! Nghỉ dài 15 phút."
+                msg = "🎉 Bạn rất giỏi! Nghỉ dài 15 phút nhé."
             else:
                 self.current_time_left = self.short_break
-                msg = "✅ Hoàn thành 1 Pomodoro! Nghỉ ngắn 5 phút."
+                msg = "✅ Hoàn thành! Nghỉ ngắn 5 phút nào."
             self.is_study = False
         else:
             self.current_time_left = self.study_time
             self.is_study = True
-            msg = "📚 Hết giờ nghỉ! Học tiếp nào!"
+            msg = "📚 Hết giờ nghỉ! Quay lại học thôi."
 
         self.show_notification(msg)
         self.update_timer_display()
 
     def show_notification(self, message):
-        self.notif_label.config(text=message, fg=self.green_accent)
+        self.notif_label.config(text=message)
         self.root.after(4000, lambda: self.notif_label.config(text=""))
 
-    # ================== ĐIỀU KHIỂN ==================
     def start_pause(self):
         if not self.is_running:
             self.is_running = True
             self.is_paused = False
-            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#0F1419")
+            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#FFFFFF")
+            
+            # Tính thời điểm kết thúc dựa trên thời gian hiện tại
+            self.end_time = time.time() + self.current_time_left
+            
             if self.is_study and self.current_game:
                 self.current_game.start()
             self.countdown()
+            
         elif self.is_running and not self.is_paused:
             self.is_paused = True
-            self.start_pause_btn.config(text="▶ TIẾP TỤC", bg=self.green_accent, fg="#0F1419")
+            self.start_pause_btn.config(text="▶ TIẾP TỤC", bg=self.green_accent, fg="#000000")
             if self.after_id:
                 self.root.after_cancel(self.after_id)
             if self.current_game:
-                self.current_game.stop()
+                self.current_game.pause()
+                
         elif self.is_running and self.is_paused:
             self.is_paused = False
-            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#0F1419")
+            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#FFFFFF")
+            
+            # Tính lại thời điểm kết thúc mới
+            self.end_time = time.time() + self.current_time_left
+            
             if self.is_study and self.current_game:
-                self.current_game.start()
+                self.current_game.resume()
             self.countdown()
 
     def reset(self):
@@ -603,11 +682,11 @@ class StudyTimer:
         self.is_paused = False
         self.is_study = True
         self.current_time_left = self.study_time
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#0F1419")
+        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000")
         if self.current_game:
             self.current_game.stop()
         self.update_timer_display()
-        self.show_notification("↺ Đã đặt lại thời gian học")
+        self.show_notification("↺ Đã đặt lại thời gian")
 
     def skip(self):
         if self.after_id:
@@ -617,12 +696,12 @@ class StudyTimer:
         if self.is_study:
             self.current_time_left = self.short_break
             self.is_study = False
-            msg = "⏩ Chuyển sang nghỉ ngắn."
+            msg = "⏩ Chuyển sang giờ nghỉ."
         else:
             self.current_time_left = self.study_time
             self.is_study = True
             msg = "⏩ Quay lại học tập."
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#0F1419")
+        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000")
         if self.current_game:
             self.current_game.stop()
         self.update_timer_display()
@@ -633,26 +712,22 @@ class StudyTimer:
             study = int(self.study_entry.get())
             short = int(self.short_break_entry.get())
             long = int(self.long_break_entry.get())
-            if study <= 0 or short <= 0 or long <= 0:
-                raise ValueError
+            if study <= 0 or short <= 0 or long <= 0: raise ValueError
             self.study_time = study * 60
             self.short_break = short * 60
             self.long_break = long * 60
-            if self.after_id:
-                self.root.after_cancel(self.after_id)
+            if self.after_id: self.root.after_cancel(self.after_id)
             self.is_running = False
             self.is_paused = False
             self.is_study = True
             self.current_time_left = self.study_time
-            self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#0F1419")
-            if self.current_game:
-                self.current_game.stop()
+            self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000")
+            if self.current_game: self.current_game.stop()
             self.update_timer_display()
-            self.show_notification("✓ Đã áp dụng thời gian mới")
+            self.show_notification("✓ Đã lưu cài đặt mới")
         except ValueError:
-            self.show_notification("⚠️ Vui lòng nhập số phút hợp lệ")
+            self.show_notification("⚠️ Hãy nhập số phút hợp lệ nhé!")
 
-# =========================== CHẠY ỨNG DỤNG ===========================
 if __name__ == "__main__":
     root = tk.Tk()
     app = StudyTimer(root)
