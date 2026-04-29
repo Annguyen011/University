@@ -7,6 +7,7 @@ import os
 import sqlite3
 from datetime import datetime
 import sys
+import customtkinter as ctk
 
 import threading
 try:
@@ -1569,7 +1570,8 @@ class StudyTimer:
         self.text_color = "#F8FAFC"     # Slate-50
         self.sub_color = "#94A3B8"      # Slate-400
         self.root.configure(bg=self.bg_color)
-        self.root.resizable(False, False)
+        self.root.minsize(900, 650)
+        self.root.resizable(True, True)
 
         self.db = DBManager()
 
@@ -1577,12 +1579,14 @@ class StudyTimer:
         self.short_break = 5 * 60
         self.long_break = 15 * 60
         self.current_time_left = self.study_time
+        self.current_total_time = self.study_time
         self.end_time = 0
         self.is_running = False
         self.is_paused = False
         self.is_study = True
         self.pomodoro_count = 0
         self.after_id = None
+        self.last_tick_time = 0
 
         # Báo thức
         self.alarm_time = None
@@ -1606,113 +1610,180 @@ class StudyTimer:
         style.theme_use('clam')
         style.configure("TCombobox", fieldbackground=self.card_bg, background=self.card_bg, foreground=self.text_color, arrowcolor=self.text_color, borderwidth=0, lightcolor=self.card_bg, darkcolor=self.card_bg)
 
-        # Main container
-        main_container = tk.Frame(self.root, bg=self.bg_color)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
-
-        # --- BẢNG BÊN TRÁI (TIMER & SETTINGS) ---
-        left_panel = tk.Frame(main_container, bg=self.frame_bg, width=420)
-        left_panel.pack(side=tk.LEFT, fill=tk.Y, expand=False, padx=(0, 15))
-        left_panel.pack_propagate(False)
-
-        # Tiêu đề & Thống kê
-        tk.Label(left_panel, text="🎯 TẬP TRUNG", font=("Segoe UI", 24, "bold"), fg=self.text_color, bg=self.frame_bg).pack(pady=(30, 5))
+        # Top taskbar
+        top_bar = ctk.CTkFrame(self.root, fg_color=self.frame_bg, corner_radius=0, height=60)
+        top_bar.pack(fill=tk.X, side=tk.TOP, pady=(0, 20))
+        
+        title_label = ctk.CTkLabel(top_bar, text="⏳ Study Timer Premium", font=("Segoe UI", 20, "bold"), text_color=self.text_color)
+        title_label.pack(side=tk.LEFT, padx=20, pady=15)
+        
+        self.mini_btn = ctk.CTkButton(top_bar, text="⛶ Thu Gọn", font=("Segoe UI", 12, "bold"), fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569", width=80, height=30, corner_radius=10, command=self.toggle_mini_mode)
+        self.mini_btn.pack(side=tk.LEFT, padx=10, pady=15)
         
         total, streak, _ = self.db.get_stats()
-        self.stats_label = tk.Label(left_panel, text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên", font=("Segoe UI", 11, "bold"), fg="#F59E0B", bg=self.frame_bg)
-        self.stats_label.pack(pady=(0, 20))
+        self.stats_label = ctk.CTkLabel(top_bar, text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên", font=("Segoe UI", 14, "bold"), text_color="#F59E0B")
+        self.stats_label.pack(side=tk.RIGHT, padx=20, pady=15)
+
+        # Main container (dưới taskbar)
+        main_container = ctk.CTkFrame(self.root, fg_color=self.bg_color, corner_radius=0)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+
+        # --- BẢNG BÊN TRÁI (TIMER) ---
+        left_panel = ctk.CTkFrame(main_container, fg_color=self.frame_bg, corner_radius=20, width=350)
+        left_panel.pack(side=tk.LEFT, fill=tk.Y, expand=False, padx=(0, 20))
+        left_panel.pack_propagate(False)
 
         # Vòng tròn đồng hồ hiện đại
-        self.canvas = tk.Canvas(left_panel, width=300, height=300, bg=self.frame_bg, highlightthickness=0)
-        self.canvas.pack(pady=20)
-        self.canvas.create_oval(15, 15, 285, 285, outline=self.card_bg, width=12)
-        self.progress_arc = self.canvas.create_arc(15, 15, 285, 285, start=90, extent=-360, outline=self.green_accent, width=12, style=tk.ARC)
-        self.timer_text = self.canvas.create_text(150, 130, text="25:00", font=("Segoe UI", 56, "bold"), fill=self.text_color)
-        self.status_text = self.canvas.create_text(150, 185, text="HỌC TẬP", font=("Segoe UI", 16, "bold"), fill=self.green_accent)
-        self.count_text = self.canvas.create_text(150, 220, text="🍅 x 0", font=("Segoe UI", 13), fill=self.sub_color)
+        self.canvas = tk.Canvas(left_panel, width=280, height=280, bg=self.frame_bg, highlightthickness=0)
+        self.canvas.pack(pady=(30, 10))
+        self.canvas.create_oval(10, 10, 270, 270, outline=self.card_bg, width=12)
+        self.progress_arc = self.canvas.create_arc(10, 10, 270, 270, start=90, extent=-360, outline=self.green_accent, width=12, style=tk.ARC)
+        self.timer_text = self.canvas.create_text(140, 120, text="25:00", font=("Segoe UI", 50, "bold"), fill=self.text_color)
+        self.status_text = self.canvas.create_text(140, 175, text="HỌC TẬP", font=("Segoe UI", 16, "bold"), fill=self.green_accent)
+        self.count_text = self.canvas.create_text(140, 210, text="🍅 x 0", font=("Segoe UI", 13), fill=self.sub_color)
 
-        self.notif_label = tk.Label(left_panel, text="Sẵn sàng để bắt đầu!", font=("Segoe UI", 11, "italic"), fg="#38BDF8", bg=self.frame_bg)
-        self.notif_label.pack(pady=(10, 20))
+        self.notif_label = ctk.CTkLabel(left_panel, text="Sẵn sàng để bắt đầu!", font=("Segoe UI", 14, "italic"), text_color="#38BDF8")
+        self.notif_label.pack(pady=(0, 20))
 
         # Khu vực nút bấm
-        btn_frame = tk.Frame(left_panel, bg=self.frame_bg)
-        btn_frame.pack(pady=10)
+        btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        btn_frame.pack(pady=5)
         
-        self.start_pause_btn = tk.Button(btn_frame, text="▶ BẮT ĐẦU", font=("Segoe UI", 14, "bold"), bg=self.green_accent, fg="#000000", activebackground="#059669", relief=tk.FLAT, bd=0, width=16, pady=10, cursor="hand2", command=self.start_pause)
-        self.start_pause_btn.grid(row=0, column=0, columnspan=2, pady=(0, 15))
+        self.start_pause_btn = ctk.CTkButton(btn_frame, text="▶ BẮT ĐẦU", font=("Segoe UI", 16, "bold"), fg_color=self.green_accent, text_color="#000000", hover_color="#059669", width=220, height=50, corner_radius=25, command=self.start_pause)
+        self.start_pause_btn.grid(row=0, column=0, columnspan=2, pady=(0, 20))
         
-        self.reset_btn = tk.Button(btn_frame, text="↺ Đặt Lại", font=("Segoe UI", 11, "bold"), bg=self.card_bg, fg=self.text_color, activebackground="#475569", relief=tk.FLAT, bd=0, width=12, pady=6, cursor="hand2", command=self.reset)
-        self.reset_btn.grid(row=1, column=0, padx=8)
+        self.reset_btn = ctk.CTkButton(btn_frame, text="↺ Đặt Lại", font=("Segoe UI", 14, "bold"), fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569", width=105, height=40, corner_radius=10, command=self.reset)
+        self.reset_btn.grid(row=1, column=0, padx=5)
         
-        self.skip_btn = tk.Button(btn_frame, text="⏭ Bỏ Qua", font=("Segoe UI", 11, "bold"), bg=self.card_bg, fg=self.text_color, activebackground="#475569", relief=tk.FLAT, bd=0, width=12, pady=6, cursor="hand2", command=self.skip)
-        self.skip_btn.grid(row=1, column=1, padx=8)
+        self.skip_btn = ctk.CTkButton(btn_frame, text="⏭ Bỏ Qua", font=("Segoe UI", 14, "bold"), fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569", width=105, height=40, corner_radius=10, command=self.skip)
+        self.skip_btn.grid(row=1, column=1, padx=5)
 
-        # --- BẢNG BÊN PHẢI (CHILL MINI GAME) ---
-        right_panel = tk.Frame(main_container, bg=self.bg_color)
+        # --- BẢNG BÊN PHẢI ---
+        right_panel = ctk.CTkFrame(main_container, fg_color="transparent")
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # Card 1: Settings
-        set_card = tk.Frame(right_panel, bg=self.frame_bg, padx=20, pady=15)
-        set_card.pack(fill=tk.X, pady=(0, 15))
-        tk.Label(set_card, text="⚙️ CÀI ĐẶT THỜI GIAN", font=("Segoe UI", 12, "bold"), fg=self.text_color, bg=self.frame_bg).pack(anchor="w", pady=(0, 10))
+        # Card 1: Gộp Settings & Alarm nằm ngang để tối ưu khoảng trống
+        top_right_card = ctk.CTkFrame(right_panel, fg_color=self.frame_bg, corner_radius=20)
+        top_right_card.pack(fill=tk.X, pady=(0, 15), ipadx=10, ipady=10)
         
-        set_grid = tk.Frame(set_card, bg=self.frame_bg)
+        grid_container = ctk.CTkFrame(top_right_card, fg_color="transparent")
+        grid_container.pack(fill=tk.X, padx=10, pady=5)
+        
+        settings_frame = ctk.CTkFrame(grid_container, fg_color="transparent")
+        settings_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True)
+        ctk.CTkLabel(settings_frame, text="⚙️ CÀI ĐẶT THỜI GIAN", font=("Segoe UI", 14, "bold"), text_color=self.text_color).pack(anchor="w", padx=10, pady=(5, 10))
+        
+        set_grid = ctk.CTkFrame(settings_frame, fg_color="transparent")
         set_grid.pack(fill=tk.X)
-        
-        fields = [("📚 Học (phút)", "study", 25), ("☕ Nghỉ Ngắn", "short_break", 5), ("😴 Nghỉ Dài", "long_break", 15)]
+        fields = [("📚 Học", "study", 25), ("☕ Ngắn", "short_break", 5), ("😴 Dài", "long_break", 15)]
         for i, (label_text, attr, default) in enumerate(fields):
-            tk.Label(set_grid, text=label_text, font=("Segoe UI", 10, "bold"), fg=self.sub_color, bg=self.frame_bg).grid(row=0, column=i, padx=15, pady=(0, 5), sticky="w")
-            entry = tk.Entry(set_grid, font=("Segoe UI", 14, "bold"), bg=self.card_bg, fg=self.text_color, insertbackground=self.text_color, relief=tk.FLAT, bd=0, width=8, justify=tk.CENTER)
+            ctk.CTkLabel(set_grid, text=label_text, font=("Segoe UI", 12, "bold"), text_color=self.sub_color).grid(row=0, column=i, padx=5)
+            entry = ctk.CTkEntry(set_grid, font=("Segoe UI", 16, "bold"), fg_color=self.card_bg, text_color=self.text_color, border_width=0, width=55, justify=tk.CENTER, corner_radius=10)
             entry.insert(0, str(default))
-            entry.grid(row=1, column=i, padx=15, pady=(0, 10))
+            entry.grid(row=1, column=i, padx=5, pady=(5, 5))
             setattr(self, f"{attr}_entry", entry)
+            
+        self.apply_btn = ctk.CTkButton(settings_frame, text="✓ LƯU", font=("Segoe UI", 12, "bold"), fg_color=self.card_bg, text_color=self.green_accent, hover_color="#475569", corner_radius=10, command=self.apply_settings, height=30)
+        self.apply_btn.pack(fill=tk.X, padx=10, pady=(10, 5))
         
-        self.apply_btn = tk.Button(set_card, text="✓ LƯU CÀI ĐẶT", font=("Segoe UI", 10, "bold"), bg=self.card_bg, fg=self.green_accent, activebackground="#475569", relief=tk.FLAT, bd=0, command=self.apply_settings, cursor="hand2", pady=5)
-        self.apply_btn.pack(fill=tk.X, pady=(15, 0), padx=10)
+        ctk.CTkFrame(grid_container, width=2, fg_color=self.card_bg).pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # Card 2: Alarm
-        alarm_card = tk.Frame(right_panel, bg=self.frame_bg, padx=20, pady=15)
-        alarm_card.pack(fill=tk.X, pady=(0, 15))
+        alarm_frame = ctk.CTkFrame(grid_container, fg_color="transparent")
+        alarm_frame.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
+        ctk.CTkLabel(alarm_frame, text="⏰ BÁO THỨC", font=("Segoe UI", 14, "bold"), text_color=self.text_color).pack(anchor="w", padx=10, pady=(5, 10))
         
-        tk.Label(alarm_card, text="⏰ BÁO THỨC", font=("Segoe UI", 12, "bold"), fg=self.text_color, bg=self.frame_bg).grid(row=0, column=0, sticky="w")
+        spin_frame = ctk.CTkFrame(alarm_frame, fg_color="transparent")
+        spin_frame.pack(fill=tk.X, pady=(0, 5))
         
-        spin_frame = tk.Frame(alarm_card, bg=self.frame_bg)
-        spin_frame.grid(row=0, column=1, padx=20)
         self.alarm_hour_var = tk.StringVar(value="07")
         self.alarm_min_var = tk.StringVar(value="00")
-        tk.Spinbox(spin_frame, from_=0, to=23, format="%02.0f", textvariable=self.alarm_hour_var, width=3, font=("Segoe UI", 16, "bold"), bg=self.card_bg, fg=self.text_color, bd=0, buttonbackground=self.card_bg, justify="center").pack(side=tk.LEFT)
-        tk.Label(spin_frame, text=":", font=("Segoe UI", 14, "bold"), fg=self.text_color, bg=self.frame_bg).pack(side=tk.LEFT, padx=5)
-        tk.Spinbox(spin_frame, from_=0, to=59, format="%02.0f", textvariable=self.alarm_min_var, width=3, font=("Segoe UI", 16, "bold"), bg=self.card_bg, fg=self.text_color, bd=0, buttonbackground=self.card_bg, justify="center").pack(side=tk.LEFT)
         
-        self.alarm_btn = tk.Button(alarm_card, text="BẬT", font=("Segoe UI", 10, "bold"), bg=self.card_bg, fg=self.text_color, activebackground="#475569", relief=tk.FLAT, bd=0, cursor="hand2", width=8, pady=5, command=self.toggle_alarm)
-        self.alarm_btn.grid(row=0, column=2, padx=10)
+        hours = [f"{i:02d}" for i in range(24)]
+        mins = [f"{i:02d}" for i in range(60)]
         
-        self.alarm_status_label = tk.Label(alarm_card, text="Đang tắt", font=("Segoe UI", 10, "italic"), fg=self.sub_color, bg=self.frame_bg)
-        self.alarm_status_label.grid(row=0, column=3, sticky="w")
+        self.hour_menu = ctk.CTkOptionMenu(spin_frame, values=hours, variable=self.alarm_hour_var, width=55, font=("Segoe UI", 14, "bold"), fg_color=self.card_bg, button_color=self.card_bg, dropdown_fg_color=self.card_bg)
+        self.hour_menu.pack(side=tk.LEFT, padx=(10, 2))
+        
+        ctk.CTkLabel(spin_frame, text=":", font=("Segoe UI", 16, "bold"), text_color=self.text_color).pack(side=tk.LEFT, padx=5)
+        
+        self.min_menu = ctk.CTkOptionMenu(spin_frame, values=mins, variable=self.alarm_min_var, width=55, font=("Segoe UI", 14, "bold"), fg_color=self.card_bg, button_color=self.card_bg, dropdown_fg_color=self.card_bg)
+        self.min_menu.pack(side=tk.LEFT, padx=(2, 10))
+        
+        self.alarm_btn = ctk.CTkButton(alarm_frame, text="BẬT BÁO THỨC", font=("Segoe UI", 12, "bold"), fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569", corner_radius=10, command=self.toggle_alarm, height=30)
+        self.alarm_btn.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        self.alarm_status_label = ctk.CTkLabel(alarm_frame, text="Báo thức đang tắt", font=("Segoe UI", 12, "italic"), text_color=self.sub_color)
+        self.alarm_status_label.pack(pady=(0, 5))
 
         # Card 3: Game
-        game_card = tk.Frame(right_panel, bg=self.frame_bg, padx=20, pady=15)
+        game_card = ctk.CTkFrame(right_panel, fg_color=self.frame_bg, corner_radius=20)
         game_card.pack(fill=tk.BOTH, expand=True)
         
-        game_top = tk.Frame(game_card, bg=self.frame_bg)
-        game_top.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(game_top, text="🎮 CHILL MINI GAME", font=("Segoe UI", 12, "bold"), fg=self.text_color, bg=self.frame_bg).pack(side=tk.LEFT)
+        game_top = ctk.CTkFrame(game_card, fg_color="transparent")
+        game_top.pack(fill=tk.X, padx=20, pady=(15, 10))
+        ctk.CTkLabel(game_top, text="🎮 CHILL MINI GAME", font=("Segoe UI", 14, "bold"), text_color=self.text_color).pack(side=tk.LEFT)
         
         self.game_var = tk.StringVar(value="space_shooter")
-        game_combo = ttk.Combobox(game_top, textvariable=self.game_var, state="readonly", width=20, font=("Segoe UI", 11, "bold"))
-        game_combo['values'] = ("space_shooter", "age_of_war", "auto_aoe", "dino_runner", "auto_pong")
+        games = ["space_shooter", "age_of_war", "dino_runner", "auto_pong"]
+        game_combo = ctk.CTkOptionMenu(game_top, values=games, variable=self.game_var, font=("Segoe UI", 13, "bold"), fg_color=self.card_bg, button_color=self.card_bg, dropdown_fg_color=self.card_bg, width=150, command=self.switch_game)
         game_combo.pack(side=tk.RIGHT)
-        game_combo.bind("<<ComboboxSelected>>", lambda e: self.switch_game(self.game_var.get()))
 
-        gc_container = tk.Frame(game_card, bg=self.card_bg, padx=4, pady=4)
-        gc_container.pack(expand=True)
-        self.game_canvas = tk.Canvas(gc_container, width=400, height=280, bg="#0B0C10", highlightthickness=0)
-        self.game_canvas.pack()
+        gc_container = ctk.CTkFrame(game_card, fg_color=self.card_bg, corner_radius=10)
+        gc_container.pack(expand=True, fill=tk.BOTH, padx=20, pady=(0, 10))
+        self.game_canvas = tk.Canvas(gc_container, width=520, height=320, bg="#0B0C10", highlightthickness=0, bd=0)
+        self.game_canvas.pack(expand=True)  # Không dùng fill=BOTH để giữ cố định size tỷ lệ chuẩn, ép ra giữa
 
-        tk.Label(game_card, text="Nhìn game tự chơi để mắt được nghỉ ngơi nhé 👀", font=("Segoe UI", 10, "italic"), fg=self.sub_color, bg=self.frame_bg).pack(pady=(10, 0))
+        ctk.CTkLabel(game_card, text="Nhìn game tự chơi để mắt được nghỉ ngơi nhé 👀", font=("Segoe UI", 12, "italic"), text_color=self.sub_color).pack(pady=(5, 5))
         
         if HAS_SYSTRAY:
-            tk.Label(game_card, text="💡 Bấm (X) thu nhỏ để chạy ngầm ở System Tray", font=("Segoe UI", 9), fg="#38BDF8", bg=self.frame_bg).pack(side=tk.BOTTOM)
+            ctk.CTkLabel(game_card, text="💡 Bấm (X) thu nhỏ để chạy ngầm ở System Tray", font=("Segoe UI", 11), text_color="#38BDF8").pack(side=tk.BOTTOM, pady=(0, 15))
+
+    # ==================== MINI MODE (GÓC MÀN HÌNH) ====================
+    def toggle_mini_mode(self):
+        self.root.withdraw() # Ẩn cửa sổ chính
+        self.mini_window = ctk.CTkToplevel(self.root)
+        self.mini_window.title("Mini Timer")
+
+        # Đặt cửa sổ ở góc dưới cùng bên phải
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = screen_width - 260
+        y = screen_height - 160
+        self.mini_window.geometry(f"240x110+{x}+{y}")
+        self.mini_window.attributes('-topmost', True) # Luôn nổi trên cùng
+        self.mini_window.resizable(False, False)
+        self.mini_window.configure(fg_color=self.bg_color)
+        self.mini_window.protocol("WM_DELETE_WINDOW", self.restore_main_window)
+
+        flip_frame = ctk.CTkFrame(self.mini_window, fg_color=self.frame_bg, corner_radius=15)
+        flip_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        self.mini_status_label = ctk.CTkLabel(flip_frame, text="HỌC TẬP", font=("Segoe UI", 12, "bold"), text_color=self.green_accent)
+        self.mini_status_label.pack(pady=(5, 0))
+
+        # Khung đồng hồ mô phỏng phong cách tối giản / lật giấy
+        time_container = ctk.CTkFrame(flip_frame, fg_color="#000000", corner_radius=8)
+        time_container.pack(pady=(5, 5), padx=15, fill=tk.X)
+
+        self.mini_time_label = ctk.CTkLabel(time_container, text="25:00", font=("Courier", 26, "bold"), text_color="#FFFFFF")
+        self.mini_time_label.pack(pady=2)
+
+        btn_frame = ctk.CTkFrame(flip_frame, fg_color="transparent")
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(0, 5))
+
+        self.mini_play_btn = ctk.CTkButton(btn_frame, text="⏸" if self.is_running and not self.is_paused else "▶", width=40, height=24, fg_color=self.card_bg, hover_color="#475569", command=self.start_pause)
+        self.mini_play_btn.pack(side=tk.LEFT, padx=(15, 5))
+
+        expand_btn = ctk.CTkButton(btn_frame, text="🗖 Phóng to", width=70, height=24, fg_color=self.card_bg, hover_color="#475569", command=self.restore_main_window)
+        expand_btn.pack(side=tk.RIGHT, padx=(5, 15))
+
+        self.update_timer_display()
+
+    def restore_main_window(self):
+        if hasattr(self, 'mini_window') and self.mini_window:
+            self.mini_window.destroy()
+            self.mini_window = None
+        self.root.deiconify() # Hiện lại cửa sổ chính
 
     # ==================== SYSTEM TRAY ====================
     def hide_window(self):
@@ -1755,8 +1826,8 @@ class StudyTimer:
             if 0 <= h <= 23 and 0 <= m <= 59:
                 self.alarm_time = (h, m)
                 self.alarm_active = True
-                self.alarm_btn.config(text="TẮT", bg=self.red_accent, fg="#FFFFFF", activebackground="#E11D48")
-                self.alarm_status_label.config(text=f"Đã đặt {h:02d}:{m:02d}", fg=self.green_accent)
+                self.alarm_btn.configure(text="TẮT", fg_color=self.red_accent, text_color="#FFFFFF", hover_color="#E11D48")
+                self.alarm_status_label.configure(text=f"Đã đặt {h:02d}:{m:02d}", text_color=self.green_accent)
                 self.show_notification(f"⏰ Báo thức lúc {h:02d}:{m:02d}")
             else:
                 self.show_notification("Giờ không hợp lệ!")
@@ -1766,8 +1837,8 @@ class StudyTimer:
     def cancel_alarm(self):
         self.alarm_active = False
         self.alarm_time = None
-        self.alarm_btn.config(text="BẬT", bg=self.card_bg, fg=self.text_color, activebackground="#475569")
-        self.alarm_status_label.config(text="Đang tắt", fg=self.sub_color)
+        self.alarm_btn.configure(text="BẬT", fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569")
+        self.alarm_status_label.configure(text="Đang tắt", text_color=self.sub_color)
 
     def start_alarm_check(self):
         self._check_alarm()
@@ -1788,19 +1859,44 @@ class StudyTimer:
             except:
                 pass
         self.show_notification("🔔 ĐẾN GIỜ RỒI! Báo thức đã reo.")
-        top = tk.Toplevel(self.root)
+        
+        top = ctk.CTkToplevel(self.root)
         top.title("Báo thức")
-        top.geometry("250x100")
-        top.configure(bg=self.frame_bg)
-        tk.Label(top, text="⏰ ĐÃ ĐẾN GIỜ HẸN!", font=("Segoe UI", 12, "bold"),
-                 fg="#F1C40F", bg=self.frame_bg).pack(expand=True)
-        tk.Button(top, text="OK", command=top.destroy, bg=self.green_accent, fg="#000").pack(pady=10)
+        top.geometry("300x150")
+        top.configure(fg_color=self.frame_bg)
+        top.attributes('-alpha', 0.0) # Start fully transparent
         top.attributes('-topmost', True)
+        top.transient(self.root)
 
     # ==================== CÁC HÀM CÒN LẠI (giữ nguyên) ====================
+        ctk.CTkLabel(top, text="⏰ ĐÃ ĐẾN GIỜ HẸN!", font=("Segoe UI", 16, "bold"),
+                     text_color="#F1C40F").pack(expand=True, padx=20, pady=(20, 10))
+        
+        ok_button = ctk.CTkButton(top, text="OK", fg_color=self.green_accent, text_color="#000", hover_color="#059669")
+        ok_button.pack(pady=(10, 20))
+        ok_button.configure(command=lambda: self.fade_out_window(top))
+
+        self.fade_in_window(top)
+
+    def fade_in_window(self, window, step=0.05):
+        alpha = window.attributes('-alpha')
+        if alpha < 1.0:
+            alpha = min(alpha + step, 1.0)
+            window.attributes('-alpha', alpha)
+            self.root.after(20, lambda: self.fade_in_window(window, step))
+
+    def fade_out_window(self, window, step=0.05):
+        alpha = window.attributes('-alpha')
+        if alpha > 0.0:
+            alpha = max(alpha - step, 0.0)
+            window.attributes('-alpha', alpha)
+            self.root.after(20, lambda: self.fade_out_window(window, step))
+        else:
+            window.destroy()
+
     def update_stats_ui(self):
         total, streak, _ = self.db.get_stats()
-        self.stats_label.config(text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên")
+        self.stats_label.configure(text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên")
 
     def init_game(self, game_key):
         if self.current_game:
@@ -1809,7 +1905,7 @@ class StudyTimer:
             elif isinstance(self.current_game, AutoSpaceShooterGame):
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
             self.current_game.stop()
-        w, h = 400, 280   # Kích thước game canvas mới
+        w, h = 520, 320
         if game_key == "dino_runner":
             game = DinoRunnerGame(self.game_canvas, w, h, self)
         elif game_key == "age_of_war":
@@ -1831,7 +1927,7 @@ class StudyTimer:
         self.init_game(game_key)
 
     def draw_progress(self):
-        total = self.study_time if self.is_study else self.short_break
+        total = self.current_total_time
         extent = -(360 * (self.current_time_left / total)) if total > 0 else 0
         color = self.green_accent if self.is_study else self.red_accent
         self.canvas.itemconfig(self.progress_arc, extent=extent, outline=color)
@@ -1839,25 +1935,42 @@ class StudyTimer:
     def update_timer_display(self):
         current_secs = int(math.ceil(self.current_time_left))
         mins, secs = divmod(current_secs, 60)
-        self.canvas.itemconfig(self.timer_text, text=f"{mins:02d}:{secs:02d}")
+        time_str = f"{mins:02d}:{secs:02d}"
+        self.canvas.itemconfig(self.timer_text, text=time_str)
         status = "HỌC TẬP" if self.is_study else "NGHỈ NGƠI"
         color = self.green_accent if self.is_study else self.red_accent
         self.canvas.itemconfig(self.status_text, text=status, fill=color)
         self.canvas.itemconfig(self.count_text, text=f"🍅 x {self.pomodoro_count}")
         self.draw_progress()
 
+        # Đồng bộ giao diện của cửa sổ Mini nếu nó đang được mở
+        if hasattr(self, 'mini_window') and self.mini_window and self.mini_window.winfo_exists():
+            self.mini_time_label.configure(text=time_str)
+            self.mini_status_label.configure(text=status, text_color=color)
+            self.mini_play_btn.configure(text="⏸" if self.is_running and not self.is_paused else "▶")
+
     def countdown(self):
         if self.is_running and not self.is_paused:
-            self.current_time_left = max(0, self.end_time - time.time())
+            time_now = time.time()
+            self.current_time_left = max(0, self.end_time - time_now)
+
             self.update_timer_display()
             if self.current_time_left > 0:
                 self.after_id = self.root.after(50, self.countdown)
             else:
                 self.timer_finished()
 
+    def play_chime(self):
+        try:
+            import winsound
+            winsound.Beep(880, 200) # Nhịp 1 thấp
+            winsound.Beep(1046, 400) # Nhịp 2 cao và dài hơn
+        except:
+            play_beep()
+
     def timer_finished(self):
         self.is_running = False
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000")
+        self.start_pause_btn.configure(text="▶ BẮT ĐẦU", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
         if self.current_game:
             if isinstance(self.current_game, AgeOfWarGame):
                 self.current_game.save_state_to_db()
@@ -1865,47 +1978,54 @@ class StudyTimer:
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
             self.current_game.stop()
         if self.is_study:
+            # Phát âm thanh báo hiệu khi vừa hết giờ học ở dưới nền
+            threading.Thread(target=self.play_chime, daemon=True).start()
+            
             self.pomodoro_count += 1
             self.db.update_session()
             self.update_stats_ui()
             self.update_timer_display()
             if self.pomodoro_count % 4 == 0:
                 self.current_time_left = self.long_break
+                self.current_total_time = self.long_break
                 msg = "🎉 Bạn rất giỏi! Nghỉ dài 15 phút nhé."
             else:
                 self.current_time_left = self.short_break
+                self.current_total_time = self.short_break
                 msg = "✅ Hoàn thành! Nghỉ ngắn 5 phút nào."
             self.is_study = False
         else:
             self.current_time_left = self.study_time
+            self.current_total_time = self.study_time
             self.is_study = True
             msg = "📚 Hết giờ nghỉ! Quay lại học thôi."
         self.show_notification(msg)
         self.update_timer_display()
 
     def show_notification(self, message):
-        self.notif_label.config(text=message, fg="#38BDF8")
-        self.root.after(4000, lambda: self.notif_label.config(text="Sẵn sàng để bắt đầu!"))
+        self.notif_label.configure(text=message, text_color="#38BDF8")
+        self.root.after(4000, lambda: self.notif_label.configure(text="Sẵn sàng để bắt đầu!"))
 
     def start_pause(self):
         if not self.is_running:
             self.is_running = True
             self.is_paused = False
-            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#FFFFFF", activebackground="#E11D48")
+            self.start_pause_btn.configure(text="⏸ TẠM DỪNG", fg_color=self.red_accent, text_color="#FFFFFF", hover_color="#E11D48")
             self.end_time = time.time() + self.current_time_left
             if self.is_study and self.current_game:
                 self.current_game.start()
             self.countdown()
         elif self.is_running and not self.is_paused:
             self.is_paused = True
-            self.start_pause_btn.config(text="▶ TIẾP TỤC", bg=self.green_accent, fg="#000000", activebackground="#059669")
+            self.start_pause_btn.configure(text="▶ TIẾP TỤC", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
             if self.after_id:
                 self.root.after_cancel(self.after_id)
             if self.current_game:
                 self.current_game.pause()
+            self.update_timer_display()
         elif self.is_running and self.is_paused:
             self.is_paused = False
-            self.start_pause_btn.config(text="⏸ TẠM DỪNG", bg=self.red_accent, fg="#FFFFFF", activebackground="#E11D48")
+            self.start_pause_btn.configure(text="⏸ TẠM DỪNG", fg_color=self.red_accent, text_color="#FFFFFF", hover_color="#E11D48")
             self.end_time = time.time() + self.current_time_left
             if self.is_study and self.current_game:
                 self.current_game.resume()
@@ -1918,7 +2038,9 @@ class StudyTimer:
         self.is_paused = False
         self.is_study = True
         self.current_time_left = self.study_time
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000", activebackground="#059669")
+        self.current_total_time = self.study_time
+        self.last_tick_time = 0
+        self.start_pause_btn.configure(text="▶ BẮT ĐẦU", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
         if self.current_game:
             if isinstance(self.current_game, AgeOfWarGame):
                 self.current_game.save_state_to_db()
@@ -1935,19 +2057,22 @@ class StudyTimer:
         self.is_paused = False
         if self.is_study:
             self.current_time_left = self.short_break
+            self.current_total_time = self.short_break
             self.is_study = False
             msg = "⏩ Chuyển sang giờ nghỉ."
         else:
             self.current_time_left = self.study_time
+            self.current_total_time = self.study_time
             self.is_study = True
             msg = "⏩ Quay lại học tập."
-        self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000", activebackground="#059669")
+        self.start_pause_btn.configure(text="▶ BẮT ĐẦU", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
         if self.current_game:
             if isinstance(self.current_game, AgeOfWarGame):
                 self.current_game.save_state_to_db()
             elif isinstance(self.current_game, AutoSpaceShooterGame):
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
             self.current_game.stop()
+        self.last_tick_time = 0
         self.update_timer_display()
         self.show_notification(msg)
 
@@ -1967,7 +2092,9 @@ class StudyTimer:
             self.is_paused = False
             self.is_study = True
             self.current_time_left = self.study_time
-            self.start_pause_btn.config(text="▶ BẮT ĐẦU", bg=self.green_accent, fg="#000000", activebackground="#059669")
+            self.current_total_time = self.study_time
+            self.last_tick_time = 0
+            self.start_pause_btn.configure(text="▶ BẮT ĐẦU", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
             if self.current_game:
                 if isinstance(self.current_game, AgeOfWarGame):
                     self.current_game.save_state_to_db()
@@ -1980,7 +2107,9 @@ class StudyTimer:
             self.show_notification("⚠️ Hãy nhập số phút hợp lệ nhé!")
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    import customtkinter as ctk
+    ctk.set_appearance_mode("dark")
+    root = ctk.CTk()
     app = StudyTimer(root)
     root.mainloop()
     
