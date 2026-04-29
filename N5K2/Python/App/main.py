@@ -55,6 +55,8 @@ class DBManager:
         cursor.execute('''CREATE TABLE IF NOT EXISTS space_shooter_save
                           (id INTEGER PRIMARY KEY,
                            coins INTEGER, w_lvl INTEGER, f_lvl INTEGER, d_lvl INTEGER, s_lvl INTEGER)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS daily_time
+                          (date TEXT PRIMARY KEY, study_secs REAL, break_secs REAL)''')
         cursor.execute("SELECT * FROM stats WHERE id=1")
         if not cursor.fetchone():
             cursor.execute("INSERT INTO stats (id, total_sessions, streak, last_date) VALUES (1, 0, 0, '')")
@@ -95,6 +97,27 @@ class DBManager:
         conn.close()
         return streak, total
 
+    def add_time(self, is_study, seconds):
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO daily_time (date, study_secs, break_secs) VALUES (?, 0, 0)", (date_str,))
+        if is_study:
+            cursor.execute("UPDATE daily_time SET study_secs = study_secs + ? WHERE date = ?", (seconds, date_str))
+        else:
+            cursor.execute("UPDATE daily_time SET break_secs = break_secs + ? WHERE date = ?", (seconds, date_str))
+        conn.commit()
+        conn.close()
+
+    def get_today_time(self):
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_secs, break_secs FROM daily_time WHERE date = ?", (date_str,))
+        res = cursor.fetchone()
+        conn.close()
+        return res if res else (0, 0)
+
     def get_highscore(self, game_name):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -111,6 +134,18 @@ class DBManager:
         conn.commit()
         conn.close()
         return new_val
+
+    def set_highscore_if_higher(self, game_name, new_score):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT score FROM highscores WHERE game_name=?", (game_name,))
+        res = cursor.fetchone()
+        current_highscore = res[0] if res else 0
+        if new_score > current_highscore:
+            cursor.execute("INSERT OR REPLACE INTO highscores (game_name, score) VALUES (?, ?)", (game_name, new_score))
+            conn.commit()
+        conn.close()
+        return max(current_highscore, new_score)
 
     def get_aow_save(self):
         conn = sqlite3.connect(self.db_path)
@@ -185,290 +220,207 @@ class MiniGame:
         self.width = width
         self.height = height
 
-# ===================== GAME 1: DINO RUNNER =====================
-class DinoRunnerGame(MiniGame):
+# ===================== GAME 1: SNAKE GAME =====================
+class SnakeGame(MiniGame):
     def __init__(self, canvas, width, height, app):
         super().__init__(canvas, width, height, app)
-        self.COLOR = "#535353"
-        self.BG_COLOR = "#F7F7F7"
-        self.ground_y = height - 35
+        self.CELL_SIZE = 15
         self.reset()
 
     def reset(self):
-        self.dino = {"x": 50, "y": self.ground_y - 44, "vy": 0, "jumping": False, "frame": 0}
-        self.obstacles = []
-        self.ground_pixels = [{"x": random.randint(0, self.width), "y": random.randint(self.ground_y+2, self.height-5)} for _ in range(20)]
-        self.clouds = [{"x": random.randint(0, self.width), "y": random.randint(30, 80)} for _ in range(3)]
-        self.speed = 7
+        self.GRID_WIDTH = max(10, self.width // self.CELL_SIZE)
+        self.GRID_HEIGHT = max(10, self.height // self.CELL_SIZE)
+        self.snake = [(self.GRID_WIDTH // 2, self.GRID_HEIGHT // 2)]
+        self.direction = "Right"
+        self.next_direction = "Right"
+        self.food = self._place_food()
         self.score = 0
-        self.frame_count = 0
-        self.high_score = self.app.db.get_highscore("dino_runner") if self.app else 0
+        self.game_over = False
+        self.speed = 120
+        self.high_score = self.app.db.get_highscore("snake_game") if self.app else 0
+        self.frame_timer = 0
 
-    def draw_dino(self, x, y):
-        c = self.COLOR
-        leg_frame = (self.frame_count // 6) % 2
-        self.canvas.create_rectangle(x+22, y, x+44, y+16, fill=c, outline="")
-        self.canvas.create_rectangle(x+24, y+2, x+28, y+6, fill=self.BG_COLOR, outline="")
-        self.canvas.create_rectangle(x+2, y+16, x+24, y+32, fill=c, outline="")
-        self.canvas.create_rectangle(x, y+18, x+5, y+28, fill=c, outline="")
-        self.canvas.create_rectangle(x+24, y+16, x+30, y+24, fill=c, outline="")
-        if self.dino["jumping"]:
-            self.canvas.create_rectangle(x+10, y+32, x+16, y+38, fill=c, outline="")
-            self.canvas.create_rectangle(x+20, y+32, x+26, y+38, fill=c, outline="")
-        elif leg_frame == 0:
-            self.canvas.create_rectangle(x+10, y+32, x+18, y+36, fill=c, outline="")
-            self.canvas.create_rectangle(x+20, y+32, x+26, y+44, fill=c, outline="")
-            self.canvas.create_rectangle(x+26, y+40, x+32, y+44, fill=c, outline="")
-        else:
-            self.canvas.create_rectangle(x+10, y+32, x+16, y+44, fill=c, outline="")
-            self.canvas.create_rectangle(x+10, y+40, x+16, y+44, fill=c, outline="")
-            self.canvas.create_rectangle(x+18, y+32, x+26, y+36, fill=c, outline="")
-
-    def resize(self, width, height):
-        super().resize(width, height)
-        self.ground_y = height - 35
-        if not self.dino["jumping"]:
-            self.dino["y"] = self.ground_y - 44
-
-    def draw_cactus(self, x, y, size_type):
-        c = self.COLOR
-        if size_type == 0:
-            self.canvas.create_rectangle(x+5, y, x+10, y+30, fill=c, outline="")
-            self.canvas.create_rectangle(x, y+5, x+5, y+15, fill=c, outline="")
-            self.canvas.create_rectangle(x+10, y+10, x+15, y+20, fill=c, outline="")
-        else:
-            self.canvas.create_rectangle(x+7, y, x+15, y+45, fill=c, outline="")
-            self.canvas.create_rectangle(x, y+10, x+7, y+25, fill=c, outline="")
-            self.canvas.create_rectangle(x+15, y+15, x+22, y+30, fill=c, outline="")
-
-    def draw_bird(self, x, y):
-        c = self.COLOR
-        wing_up = (self.frame_count // 10) % 2
-        self.canvas.create_rectangle(x+10, y+5, x+30, y+15, fill=c, outline="")
-        self.canvas.create_rectangle(x, y+8, x+10, y+12, fill=c, outline="")
-        if wing_up:
-            self.canvas.create_polygon(x+15, y+5, x+25, y+5, x+20, y-10, fill=c)
-        else:
-            self.canvas.create_polygon(x+15, y+15, x+25, y+15, x+20, y+25, fill=c)
-
-    def update(self):
-        if not self.active:
-            return
-        self.frame_count += 1
-        self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill=self.BG_COLOR, outline="")
-        self.canvas.create_line(0, self.ground_y, self.width, self.ground_y, fill=self.COLOR)
-        for p in self.ground_pixels:
-            p["x"] -= self.speed
-            if p["x"] < 0:
-                p["x"] = self.width + 10
-            self.canvas.create_rectangle(p["x"], p["y"], p["x"]+2, p["y"]+1, fill=self.COLOR, outline="")
-        for cl in self.clouds:
-            cl["x"] -= self.speed * 0.1
-            if cl["x"] < -60:
-                cl["x"] = self.width + 20
-                cl["y"] = random.randint(30, 80)
-            self.canvas.create_rectangle(cl["x"], cl["y"], cl["x"]+30, cl["y"]+2, fill="#E1E1E1", outline="")
-
-        if not self.dino["jumping"]:
-            for obs in self.obstacles:
-                dist = obs["x"] - (self.dino["x"] + 40)
-                if 0 < dist < (50 + self.speed * 8):
-                    if obs["type"] != "bird" or obs["y"] > self.ground_y - 50:
-                        self.dino["vy"] = -13
-                        self.dino["jumping"] = True
-                        if self.app: self.app.play_game_sound("jump")
-                        break
-        if self.dino["jumping"]:
-            self.dino["vy"] += 0.8
-            self.dino["y"] += self.dino["vy"]
-            if self.dino["y"] >= self.ground_y - 44:
-                self.dino["y"] = self.ground_y - 44
-                self.dino["jumping"] = False
-
-        if self.frame_count % random.randint(50, 100) == 0:
-            r = random.random()
-            if self.score > 500 and r > 0.8:
-                by = random.choice([self.ground_y-65, self.ground_y-40, self.ground_y-15])
-                self.obstacles.append({"x": self.width, "y": by, "w": 40, "h": 20, "type": "bird"})
-            elif r > 0.4:
-                count = random.randint(1, 3)
-                self.obstacles.append({"x": self.width, "y": self.ground_y-30, "w": 15*count, "h": 30, "type": "cactus", "st": 0, "cnt": count})
-            else:
-                self.obstacles.append({"x": self.width, "y": self.ground_y-45, "w": 25, "h": 45, "type": "cactus", "st": 1, "cnt": 1})
-
-        for obs in self.obstacles[:]:
-            obs["x"] -= self.speed
-            if obs["type"] == "cactus":
-                for i in range(obs.get("cnt", 1)):
-                    self.draw_cactus(obs["x"] + i*15, obs["y"], obs["st"])
-            else:
-                self.draw_bird(obs["x"], obs["y"])
-            if obs["x"] + obs["w"] < 0:
-                self.obstacles.remove(obs)
-                self.score += 1
-                self.speed += 0.01
-            dx, dy = self.dino["x"], self.dino["y"]
-            if (dx + 10 < obs["x"] + obs["w"] and dx + 35 > obs["x"] and
-                dy + 10 < obs["y"] + obs["h"] and dy + 40 > obs["y"]):
-                self.active = False
-                if self.app: self.app.play_game_sound("die")
-                if self.app and self.score > self.high_score:
-                    self.app.db.increment_score("dino_runner")
-                self.canvas.create_text(self.width/2, self.height/2, text="G A M E  O V E R",
-                                        font=("Courier", 15, "bold"), fill=self.COLOR)
-                self.canvas.after(1500, self.start)
-                return
-        self.draw_dino(self.dino["x"], self.dino["y"])
-        score_str = f"HI {int(self.high_score):05d}  {int(self.score):05d}"
-        self.canvas.create_text(self.width-15, 20, text=score_str,
-                                font=("Courier", 10, "bold"), fill=self.COLOR, anchor="ne")
-        self.after_id = self.canvas.after(16, self.update)
-
-# ===================== GAME 2: AUTO PONG =====================
-class AutoPongGame(MiniGame):
-    def __init__(self, canvas, width, height, app):
-        super().__init__(canvas, width, height, app)
-        self.paddle_w, self.paddle_h, self.ball_r = 8, 40, 5
-        self.reset()
-
-    def resize(self, width, height):
-        super().resize(width, height)
-        # Giữ thanh trượt không bị rớt ra ngoài khi thu nhỏ
-        if hasattr(self, 'pad1_y'):
-            self.pad1_y = max(0, min(self.height - self.paddle_h, self.pad1_y))
-            self.pad2_y = max(0, min(self.height - self.paddle_h, self.pad2_y))
-
-    def reset(self):
-        self.ball_x, self.ball_y = self.width / 2, self.height / 2
-        self.ball_vx, self.ball_vy = random.choice([-5, 5]), random.choice([-4, 4])
-        self.pad1_y = self.pad2_y = self.height / 2 - self.paddle_h / 2
-
-    def update(self):
-        if not self.active:
-            return
-        self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#111111", outline="")
-        self.canvas.create_line(self.width/2, 0, self.width/2, self.height, fill="#333333", dash=(4, 4))
-        self.ball_x += self.ball_vx
-        self.ball_y += self.ball_vy
-        if self.ball_y - self.ball_r <= 0 or self.ball_y + self.ball_r >= self.height:
-            self.ball_vy = -self.ball_vy
-            if self.app: self.app.play_game_sound("hit")
-            
-        # Sửa lỗi: Check rớt bóng ra ngoài để reset
-        if self.ball_x < 0 or self.ball_x > self.width:
-            self.reset()
-            if self.app: self.app.play_game_sound("die")
-            self.after_id = self.canvas.after(20, self.update)
-            return
-            
-        # Sửa lỗi AI: Đọc ngược logic hướng đi của bóng
-        t1 = self.ball_y - 20 if self.ball_vx < 0 else self.height/2 - 20
-        t2 = self.ball_y - 20 if self.ball_vx > 0 else self.height/2 - 20
-        
-        t1 = self.ball_y - 20 if self.ball_vx > 0 else self.height/2 - 20
-        t2 = self.height/2 - 20 if self.ball_vx > 0 else self.ball_y - 20
-        self.pad1_y += (t1 - self.pad1_y) * 0.15
-        self.pad2_y += (t2 - self.pad2_y) * 0.15
-        self.pad1_y = max(0, min(self.height - 40, self.pad1_y))
-        self.pad2_y = max(0, min(self.height - 40, self.pad2_y))
-        if self.ball_x - 5 <= 23 and self.pad1_y <= self.ball_y <= self.pad1_y + 40:
-            self.ball_x, self.ball_vx = 28, -self.ball_vx
-            if self.app: self.app.play_game_sound("hit")
-        if self.ball_x + 5 >= self.width - 23 and self.pad2_y <= self.ball_y <= self.pad2_y + 40:
-            self.ball_x, self.ball_vx = self.width - 28, -self.ball_vx
-            if self.app: self.app.play_game_sound("hit")
-        self.canvas.create_rectangle(15, self.pad1_y, 23, self.pad1_y+40, fill="#00FF00", outline="")
-        self.canvas.create_rectangle(self.width-23, self.pad2_y, self.width-15, self.pad2_y+40, fill="#FF00FF", outline="")
-        self.canvas.create_oval(self.ball_x-5, self.ball_y-5, self.ball_x+5, self.ball_y+5, fill="#FFFFFF", outline="")
-        self.after_id = self.canvas.after(20, self.update)
-
-# ===================== GAME MỚI: AUTO SNAKE =====================
-class AutoSnakeGame(MiniGame):
-    def __init__(self, canvas, width, height, app):
-        super().__init__(canvas, width, height, app)
-        self.cell_size = 15
-        self.reset()
-
-    def spawn_food(self):
-        cols = self.width // self.cell_size
-        rows = self.height // self.cell_size
-        if cols < 2 or rows < 2: return (0, 0)
+    def _place_food(self):
         while True:
-            fx = random.randint(0, cols - 1)
-            fy = random.randint(0, rows - 1)
-            if (fx, fy) not in self.snake:
-                return (fx, fy)
-
-    def reset(self):
-        cols = max(5, self.width // self.cell_size)
-        rows = max(5, self.height // self.cell_size)
-        cx, cy = cols // 2, rows // 2
-        self.snake = [(cx, cy), (cx-1, cy), (cx-2, cy)]
-        self.food = self.spawn_food()
-        self.score = 0
+            if self.GRID_WIDTH <= 0 or self.GRID_HEIGHT <= 0: return (0, 0)
+            x = random.randint(0, self.GRID_WIDTH - 1)
+            y = random.randint(0, self.GRID_HEIGHT - 1)
+            if (x, y) not in self.snake:
+                return (x, y)
 
     def update(self):
-        if not self.active:
-            return
-        
-        cols = self.width // self.cell_size
-        rows = self.height // self.cell_size
-        if cols < 2 or rows < 2:
-            self.after_id = self.canvas.after(100, self.update)
+        if not self.active or self.game_over:
             return
 
-        head = self.snake[0]
-        
-        # AI tìm đường đến thức ăn (Tham lam)
-        moves = [(0, -1), (0, 1), (-1, 0), (1, 0)] # Lên, Xuống, Trái, Phải
-        safe_moves = []
-        for dx, dy in moves:
-            nx, ny = head[0] + dx, head[1] + dy
-            # Tránh tường và tự ăn đuôi
-            if 0 <= nx < cols and 0 <= ny < rows and (nx, ny) not in self.snake[:-1]:
-                dist = abs(nx - self.food[0]) + abs(ny - self.food[1])
-                safe_moves.append((dist, (nx, ny)))
-        
-        if safe_moves:
-            safe_moves.sort(key=lambda x: x[0])
-            next_head = safe_moves[0][1] # Ưu tiên đường đi ngắn nhất
-        else:
-            # Bí đường thì reset lại từ đầu
-            if self.app: self.app.play_game_sound("die")
-            self.reset()
-            self.after_id = self.canvas.after(100, self.update)
+        self.frame_timer += 30
+        if self.frame_timer < self.speed:
+            self.after_id = self.canvas.after(30, self.update)
+            return
+        self.frame_timer = 0
+
+        self._auto_choose_direction()
+        self.direction = self.next_direction
+        head_x, head_y = self.snake[0]
+
+        if self.direction == "Up":
+            new_head = (head_x, head_y - 1)
+        elif self.direction == "Down":
+            new_head = (head_x, head_y + 1)
+        elif self.direction == "Left":
+            new_head = (head_x - 1, head_y)
+        elif self.direction == "Right":
+            new_head = (head_x + 1, head_y)
+
+        if not (0 <= new_head[0] < self.GRID_WIDTH and 0 <= new_head[1] < self.GRID_HEIGHT):
+            self.game_over = True
+            self._end_game()
             return
 
-        self.snake.insert(0, next_head)
-        
-        if next_head == self.food:
-            self.score += 10
-            if self.app: self.app.play_game_sound("eat")
-            self.food = self.spawn_food()
-        else:
-            self.snake.pop()
+        ate_food = (new_head == self.food)
+        if not ate_food:
+            tail = self.snake.pop()
+            
+        if new_head in self.snake:
+            self.game_over = True
+            if not ate_food:
+                self.snake.append(tail)
+            self._end_game()
+            return
 
-        # Vẽ hình
+        self.snake.insert(0, new_head)
+        
+        if ate_food:
+            self.score += 1
+            self.speed = max(40, self.speed - 3)
+            self.food = self._place_food()
+
+        self.draw()
+        self.after_id = self.canvas.after(30, self.update)
+
+    def draw(self):
         self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#0B0C10", outline="")
-        
-        # Vẽ mồi
-        fx, fy = self.food[0]*self.cell_size, self.food[1]*self.cell_size
-        self.canvas.create_oval(fx, fy, fx+self.cell_size, fy+self.cell_size, fill="#E74C3C", outline="")
-        
-        # Vẽ rắn
-        for i, (sx, sy) in enumerate(self.snake):
-            px, py = sx*self.cell_size, sy*self.cell_size
+        self.canvas.create_rectangle(0, 0, self.width, self.height, fill="#2C3E50", outline="")
+
+        for i, (x, y) in enumerate(self.snake):
             color = "#2ECC71" if i == 0 else "#27AE60"
-            self.canvas.create_rectangle(px, py, px+self.cell_size, py+self.cell_size, fill=color, outline="#0B0C10")
+            self.canvas.create_rectangle(x * self.CELL_SIZE, y * self.CELL_SIZE, (x + 1) * self.CELL_SIZE, (y + 1) * self.CELL_SIZE, fill=color, outline="#229954")
 
-        self.canvas.create_text(10, 10, text=f"SCORE: {self.score}", anchor="nw", fill="#F1C40F", font=("Courier", 12, "bold"))
+        fx, fy = self.food
+        self.canvas.create_oval(fx * self.CELL_SIZE, fy * self.CELL_SIZE, (fx + 1) * self.CELL_SIZE, (fy + 1) * self.CELL_SIZE, fill="#E74C3C", outline="")
+
+        self.canvas.create_text(self.width - 10, 10, text=f"SCORE: {self.score}", fill="white", anchor="ne", font=("Courier", 10, "bold"))
+        self.canvas.create_text(self.width - 10, 25, text=f"HIGH: {self.high_score}", fill="white", anchor="ne", font=("Courier", 8))
+
+        if self.game_over:
+            self.canvas.create_text(self.width / 2, self.height / 2, text="GAME OVER", fill="#E74C3C", font=("Courier", 30, "bold"))
+            self.canvas.create_text(self.width / 2, self.height / 2 + 40, text="Tự động chơi lại...", fill="gray", font=("Courier", 15))
+
+    def _end_game(self):
+        if self.app:
+            self.app.db.set_highscore_if_higher("snake_game", self.score)
+            self.high_score = self.app.db.get_highscore("snake_game")
+        self.draw()
+        if self.active:
+            self.after_id = self.canvas.after(2000, self.start)
+
+    def _auto_choose_direction(self):
+        head_x, head_y = self.snake[0]
+        fx, fy = self.food
         
-        self.after_id = self.canvas.after(60, self.update)
+        rev = {"Up": "Down", "Down": "Up", "Left": "Right", "Right": "Left"}
+        banned_dir = rev.get(self.direction)
+        
+        # Xác định chướng ngại vật (thân rắn, bỏ phần đuôi vì đuôi sẽ di chuyển đi nhường chỗ)
+        obstacles = set(self.snake[:-1])
+        
+        # 1. Tìm đường ngắn nhất đến thức ăn bằng Thuật toán BFS
+        path = self._bfs((head_x, head_y), (fx, fy), obstacles, banned_dir)
+        
+        best_d = None
+        
+        if path:
+            first_move = path[0]
+            dx, dy = {"Up": (0,-1), "Down": (0,1), "Left": (-1,0), "Right": (1,0)}[first_move]
+            nx, ny = head_x + dx, head_y + dy
+            
+            # Đếm số ô trống có thể đi tới nếu đi bước này bằng Flood Fill
+            free_space = self._flood_fill((nx, ny), obstacles)
+            board_empty_spaces = (self.GRID_WIDTH * self.GRID_HEIGHT) - len(self.snake)
+            
+            # Chọn nếu đường này an toàn (không dẫn vào ngõ cụt chật hẹp)
+            if free_space >= len(self.snake) * 0.5 or free_space >= board_empty_spaces - 5:
+                best_d = first_move
+                
+        # 2. Sinh tồn: Nếu không có đường an toàn đến thức ăn, tìm hướng có không gian rộng nhất
+        if not best_d:
+            max_space = -1
+            for d, (dx, dy) in [("Up", (0,-1)), ("Down", (0,1)), ("Left", (-1,0)), ("Right", (1,0))]:
+                if d == banned_dir:
+                    continue
+                nx, ny = head_x + dx, head_y + dy
+                if 0 <= nx < self.GRID_WIDTH and 0 <= ny < self.GRID_HEIGHT:
+                    if (nx, ny) not in obstacles:
+                        space = self._flood_fill((nx, ny), obstacles)
+                        if space > max_space:
+                            max_space = space
+                            best_d = d
+            
+        if best_d:
+            self.next_direction = best_d
 
-# ===================== GAME 3: AUTO AGE OF EMPIRES (ĐẾ CHẾ TỰ CHƠI) =====================
+    def _bfs(self, start, target, obstacles, banned_first_dir=None):
+        queue = [(start, [])]
+        visited = {start}
+        head_idx = 0
+        while head_idx < len(queue):
+            (cx, cy), path = queue[head_idx]
+            head_idx += 1
+            if (cx, cy) == target:
+                return path
+            for d, (dx, dy) in [("Up", (0,-1)), ("Down", (0,1)), ("Left", (-1,0)), ("Right", (1,0))]:
+                if not path and d == banned_first_dir:
+                    continue
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < self.GRID_WIDTH and 0 <= ny < self.GRID_HEIGHT:
+                    if (nx, ny) not in obstacles and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        queue.append(((nx, ny), path + [d]))
+        return None
+
+    def _flood_fill(self, start, obstacles):
+        queue = [start]
+        visited = {start}
+        head_idx = 0
+        while head_idx < len(queue):
+            cx, cy = queue[head_idx]
+            head_idx += 1
+            for dx, dy in [(0,-1), (0,1), (-1,0), (1,0)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < self.GRID_WIDTH and 0 <= ny < self.GRID_HEIGHT:
+                    if (nx, ny) not in obstacles and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        queue.append((nx, ny))
+        return len(queue)
+
+    def start(self):
+        super().start()
+        self.reset()
+        self.active = True
+        self.update()
+
+    def stop(self):
+        super().stop()
+
+    def resize(self, width, height):
+        super().resize(width, height)
+        if self.active and not self.game_over:
+            self.GRID_WIDTH = max(10, self.width // self.CELL_SIZE)
+            self.GRID_HEIGHT = max(10, self.height // self.CELL_SIZE)
+            fx, fy = self.food
+            if fx >= self.GRID_WIDTH or fy >= self.GRID_HEIGHT:
+                self.food = self._place_food()
+
+# ===================== GAME 2: AUTO AGE OF EMPIRES (ĐẾ CHẾ TỰ CHƠI) =====================
 class AutoAOEGame(MiniGame):
     def __init__(self, canvas, width, height, app):
         super().__init__(canvas, width, height, app)
@@ -825,152 +777,103 @@ class AutoSpaceShooterGame(MiniGame):
 
     def update_gameplay(self):
         # AI TỰ ĐỘNG MUA NÂNG CẤP TỐI ƯU
-        upgrades = [
-            ("w_lvl", 50 * self.w_lvl, 5, "Vũ khí"),
-            ("f_lvl", 40 * self.f_lvl, 5, "Tốc bắn"),
-            ("d_lvl", 100 * (self.d_lvl + 1), 3, "Thuyền con"),
-            ("s_lvl", 150 * (self.s_lvl + 1), 3, "Siêu Laser")
-        ]
-        affordable = [u for u in upgrades if getattr(self, u[0]) < u[2] and self.coins >= u[1]]
+        affordable = [u for u in [("w_lvl", 50 * self.w_lvl, 5), ("f_lvl", 40 * self.f_lvl, 5), ("d_lvl", 100 * (self.d_lvl + 1), 3), ("s_lvl", 150 * (self.s_lvl + 1), 3)] if getattr(self, u[0]) < u[2] and self.coins >= u[1]]
         if affordable:
-            affordable.sort(key=lambda x: x[1]) # Mua từ rẻ nhất đến đắt nhất
-            best_upg = affordable[0]
+            best_upg = min(affordable, key=lambda x: x[1])
             self.coins -= best_upg[1]
             setattr(self, best_upg[0], getattr(self, best_upg[0]) + 1)
-            if self.app: self.app.play_game_sound("upgrade")
-            
-            # Hiệu ứng nổ hạt xanh lá báo hiệu nâng cấp thành công
-            for _ in range(15):
-                self.particles.append({"x": self.ship_x, "y": self.ship_y, "vx": random.uniform(-4, 4), "vy": random.uniform(-4, 4), "life": 25, "c": "#2ECC71"})
-            if self.app:
-                self.app.db.save_space_shooter_state(self.coins, self.w_lvl, self.f_lvl, self.d_lvl, self.s_lvl)
+            self.particles.extend([{"x": self.ship_x, "y": self.ship_y, "vx": random.uniform(-4, 4), "vy": random.uniform(-4, 4), "life": 25, "c": "#2ECC71"} for _ in range(15)])
+            if self.app: self.app.db.save_space_shooter_state(self.coins, self.w_lvl, self.f_lvl, self.d_lvl, self.s_lvl)
 
-        # Độ khó tăng theo điểm
-        diff_mult = 1 + (self.score / 1000)
-        spawn_rate = min(0.1, 0.03 * diff_mult)
-        
         # Sinh quái vật
+        spawn_rate = min(0.1, 0.03 * (1 + self.score / 1000))
         if random.random() < spawn_rate:
             r = random.random()
             base_hp = 2 + (self.score // 300)
-            if r < 0.6: # Meteor
-                self.enemies.append({"type": "meteor", "x": random.randint(20, self.width-20), "y": -20, "r": random.randint(12, 22), "hp": base_hp, "speed": random.uniform(1.2, 2.0)})
-            elif r < 0.9: # Fighter (Zig-zag)
-                self.enemies.append({"type": "fighter", "x": random.randint(20, self.width-20), "y": -20, "r": 12, "hp": base_hp - 1, "speed": random.uniform(2.0, 3.5), "dx": random.choice([-1.5, 1.5])})
-            else: # Tank
-                self.enemies.append({"type": "tank", "x": random.randint(30, self.width-30), "y": -30, "r": 25, "hp": base_hp * 3, "speed": random.uniform(0.5, 1.0)})
+            if r < 0.6: self.enemies.append({"type": "meteor", "x": random.randint(20, self.width-20), "y": -20, "r": random.randint(12, 22), "hp": base_hp, "speed": random.uniform(1.2, 2.0)})
+            elif r < 0.9: self.enemies.append({"type": "fighter", "x": random.randint(20, self.width-20), "y": -20, "r": 12, "hp": base_hp - 1, "speed": random.uniform(2.0, 3.5), "dx": random.choice([-1.5, 1.5])})
+            else: self.enemies.append({"type": "tank", "x": random.randint(30, self.width-30), "y": -30, "r": 25, "hp": base_hp * 3, "speed": random.uniform(0.5, 1.0)})
 
-        # AI Tự động điều khiển Tàu (Targeting)
-        target = None
-        max_y = -100
-        for m in self.enemies:
-            if m["y"] > max_y:
-                max_y = m["y"]
-                target = m
-
+        # AI Tự động điều khiển Tàu
+        target = max(self.enemies, key=lambda m: m["y"], default=None)
         if target:
             speed = 4 + self.f_lvl * 0.5
-            if self.ship_x < target["x"] - 5:
-                self.ship_x += speed
-            elif self.ship_x > target["x"] + 5:
-                self.ship_x -= speed
+            self.ship_x += speed if self.ship_x < target["x"] - 5 else (-speed if self.ship_x > target["x"] + 5 else 0)
             self.ship_x = max(20, min(self.width-20, self.ship_x))
 
-        # Bắn đạn cơ bản & Drones
-        if self.fire_cd > 0:
-            self.fire_cd -= 1
+        # Bắn đạn
+        if self.fire_cd > 0: self.fire_cd -= 1
         if target and abs(self.ship_x - target["x"]) < 25 and self.fire_cd == 0:
-            dmg = self.w_lvl
+            dmg, d_dmg = self.w_lvl, self.d_lvl
+            sx, sy = self.ship_x, self.ship_y
             if self.w_lvl >= 3:
-                self.lasers.append({"x": self.ship_x - 10, "y": self.ship_y - 10, "dmg": dmg, "color": "#00FFFF"})
-                self.lasers.append({"x": self.ship_x, "y": self.ship_y - 15, "dmg": dmg, "color": "#00FFFF"})
-                self.lasers.append({"x": self.ship_x + 10, "y": self.ship_y - 10, "dmg": dmg, "color": "#00FFFF"})
+                self.lasers.extend([{"x": sx-10, "y": sy-10, "dmg": dmg, "color": "#00FFFF"}, {"x": sx, "y": sy-15, "dmg": dmg, "color": "#00FFFF"}, {"x": sx+10, "y": sy-10, "dmg": dmg, "color": "#00FFFF"}])
             else:
-                self.lasers.append({"x": self.ship_x - 6, "y": self.ship_y - 10, "dmg": dmg, "color": "#00FFFF"})
-                self.lasers.append({"x": self.ship_x + 6, "y": self.ship_y - 10, "dmg": dmg, "color": "#00FFFF"})
-            
-            # Drones fire
-            if self.d_lvl > 0:
-                d_dmg = self.d_lvl
-                self.lasers.append({"x": self.ship_x - 25, "y": self.ship_y + 5, "dmg": d_dmg, "color": "#2ECC71"})
-                self.lasers.append({"x": self.ship_x + 25, "y": self.ship_y + 5, "dmg": d_dmg, "color": "#2ECC71"})
-                
-            self.fire_cd = max(3, 12 - self.f_lvl)
+                self.lasers.extend([{"x": sx, "y": sy-15, "dmg": dmg, "color": "#00FFFF"}])
+        if self.d_lvl > 0:
+                self.lasers.extend([{"x": sx-25, "y": sy+5, "dmg": d_dmg, "color": "#2ECC71"}, {"x": sx+25, "y": sy+5, "dmg": d_dmg, "color": "#2ECC71"}])
+        self.fire_cd = max(3, 12 - self.f_lvl)
 
-        # Chiêu thức Siêu Laser
+        # Siêu Laser
         if self.s_lvl > 0:
             if self.beam_active > 0:
                 self.beam_active -= 1
-                # Vẽ Beam
                 bw = 15 + self.s_lvl * 5
                 self.canvas.create_rectangle(self.ship_x - bw/2, 0, self.ship_x + bw/2, self.ship_y, fill="#9B59B6", outline="#8E44AD", stipple="gray50")
                 self.canvas.create_line(self.ship_x, 0, self.ship_x, self.ship_y, fill="#FFFFFF", width=3)
-                # Beam sát thương lập tức kẻ địch
-                for e in self.enemies[:]:
-                    if abs(e["x"] - self.ship_x) < e["r"] + bw/2:
-                        e["hp"] -= self.s_lvl * 0.5
+                for e in self.enemies:
+                    if abs(e["x"] - self.ship_x) < e["r"] + bw/2: e["hp"] -= self.s_lvl * 0.5
             else:
                 self.skill_timer -= 1
                 if self.skill_timer <= 0:
-                    self.beam_active = 20 + self.s_lvl * 5
-                    self.skill_timer = 200 - (self.s_lvl * 10)
+                    self.beam_active, self.skill_timer = 20 + self.s_lvl * 5, 200 - self.s_lvl * 10
 
-        # Cập nhật tia Laser
-        for l in self.lasers[:]:
-            l["y"] -= 8
-            w = 2 if l["color"] == "#00FFFF" else 1
-            self.canvas.create_line(l["x"], l["y"], l["x"], l["y"]+12, fill=l["color"], width=w)
-            if l["y"] < 0:
-                self.lasers.remove(l)
-
-        # Cập nhật hiệu ứng hạt (Particles) nổ tung
-        for p in self.particles[:]:
-            p["x"] += p["vx"]
-            p["y"] += p["vy"]
-            p["life"] -= 1
-            self.canvas.create_oval(p["x"]-2, p["y"]-2, p["x"]+2, p["y"]+2, fill=p["c"], outline="")
-            if p["life"] <= 0:
-                self.particles.remove(p)
-
-        # Cập nhật Quái & Va chạm
-        for m in self.enemies[:]:
+        # Cập nhật Quái, Đạn, Particles
+        active_enemies = []
+        for m in self.enemies:
+            m["y"] += m["speed"]
             if m["type"] == "fighter":
                 m["x"] += m["dx"]
-                m["y"] += m["speed"]
-                if m["x"] < 15 or m["x"] > self.width - 15: m["dx"] *= -1
+                if not (15 <= m["x"] <= self.width - 15): m["dx"] *= -1
                 self.canvas.create_polygon(m["x"], m["y"]+m["r"], m["x"]-m["r"], m["y"]-m["r"], m["x"]+m["r"], m["y"]-m["r"], fill="#E74C3C", outline="#C0392B")
                 self.canvas.create_oval(m["x"]-4, m["y"]-4, m["x"]+4, m["y"], fill="#F1C40F", outline="")
             elif m["type"] == "tank":
-                m["y"] += m["speed"]
                 self.canvas.create_rectangle(m["x"]-m["r"], m["y"]-m["r"]*0.6, m["x"]+m["r"], m["y"]+m["r"]*0.6, fill="#7F8C8D", outline="#2C3E50", width=2)
                 self.canvas.create_rectangle(m["x"]-m["r"]*0.5, m["y"]-m["r"]*0.8, m["x"]+m["r"]*0.5, m["y"]+m["r"]*0.8, fill="#95A5A6", outline="")
-            else: # Meteor
-                m["y"] += m["speed"]
+            else:
                 self.canvas.create_oval(m["x"]-m["r"], m["y"]-m["r"], m["x"]+m["r"], m["y"]+m["r"], fill="#5D4037", outline="#3E2723")
                 self.canvas.create_oval(m["x"]-m["r"]/2, m["y"]-m["r"]/2, m["x"], m["y"], fill="#4E342E", outline="")
             
-            if m["y"] - m["r"] > self.height and m in self.enemies:
-                self.enemies.remove(m)
-                continue
-                
             if m["hp"] <= 0:
-                if m in self.enemies: self.enemies.remove(m)
-                self.score += 10
-                self.coins += 1 + (m["r"] // 10)
-                if self.app: self.app.play_game_sound("explosion")
-                for _ in range(m["r"] // 2): # Hiệu ứng nổ
-                    self.particles.append({"x": m["x"], "y": m["y"], "vx": random.uniform(-3,3), "vy": random.uniform(-3,3), "life": 15, "c": "#E74C3C"})
-                continue
+                self.score += 10; self.coins += 1 + (m["r"] // 10)
+                self.particles.extend([{"x": m["x"], "y": m["y"], "vx": random.uniform(-3,3), "vy": random.uniform(-3,3), "life": 15, "c": "#E74C3C"} for _ in range(m["r"] // 2)])
+            elif m["y"] - m["r"] <= self.height:
+                active_enemies.append(m)
+        self.enemies = active_enemies
 
-            for l in self.lasers[:]:
+        active_lasers = []
+        for l in self.lasers:
+            l["y"] -= 8
+            hit = False
+            for m in self.enemies:
                 if abs(l["x"] - m["x"]) < m["r"] and abs(l["y"] - m["y"]) < m["r"]:
-                    if l in self.lasers: self.lasers.remove(l)
                     m["hp"] -= l["dmg"]
-                    for _ in range(3): # Hiệu ứng tóe lửa khi trúng đạn
-                        self.particles.append({"x": l["x"], "y": l["y"], "vx": random.uniform(-2,2), "vy": random.uniform(-2,2), "life": 10, "c": "#F1C40F"})
-                    break
+                    self.particles.extend([{"x": l["x"], "y": l["y"], "vx": random.uniform(-2,2), "vy": random.uniform(-2,2), "life": 10, "c": "#F1C40F"} for _ in range(3)])
+                    hit = True; break
+            if not hit and l["y"] >= 0:
+                self.canvas.create_line(l["x"], l["y"], l["x"], l["y"]+12, fill=l["color"], width=2 if l["color"] == "#00FFFF" else 1)
+                active_lasers.append(l)
+        self.lasers = active_lasers
 
-        # Vẽ Tàu vũ trụ tùy theo cấp độ vũ khí (Ngoại hình tiến hóa)
+        active_particles = []
+        for p in self.particles:
+            p["x"] += p["vx"]; p["y"] += p["vy"]; p["life"] -= 1
+            if p["life"] > 0:
+                self.canvas.create_oval(p["x"]-2, p["y"]-2, p["x"]+2, p["y"]+2, fill=p["c"], outline="")
+                active_particles.append(p)
+        self.particles = active_particles
+
+        # Vẽ Tàu
         sx, sy = self.ship_x, self.ship_y
         
         if self.w_lvl == 1:
@@ -989,12 +892,10 @@ class AutoSpaceShooterGame(MiniGame):
         self.canvas.create_polygon(sx-6, sy+10, sx+6, sy+10, sx, sy+18+random.uniform(-3,3), fill="#F1C40F", outline="") 
         self.canvas.create_oval(sx-4, sy-2, sx+4, sy+6, fill="#2980B9", outline="")
 
-        # Vẽ Drones (Thuyền con)
         if self.d_lvl > 0:
-            dx1, dx2 = sx - 25, sx + 25
             dy = sy + 10 + math.sin(self.score * 0.1) * 3
-            self.canvas.create_polygon(dx1, dy-6, dx1-5, dy+4, dx1+5, dy+4, fill="#2ECC71", outline="")
-            self.canvas.create_polygon(dx2, dy-6, dx2-5, dy+4, dx2+5, dy+4, fill="#2ECC71", outline="")
+            self.canvas.create_polygon(sx-25, dy-6, sx-30, dy+4, sx-20, dy+4, fill="#2ECC71", outline="")
+            self.canvas.create_polygon(sx+25, dy-6, sx+20, dy+4, sx+30, dy+4, fill="#2ECC71", outline="")
 
         # Vẽ Điểm
         self.canvas.create_text(10, 10, text=f"SCORE: {self.score}", anchor="nw", fill="#F1C40F", font=("Courier", 12, "bold"))
@@ -1251,7 +1152,6 @@ class AgeOfWarGame(MiniGame):
         if base["xp"] >= req_xp:
             base["xp"] -= req_xp
             base["age"] += 1
-            if self.app: self.app.play_game_sound("upgrade")
             base["hp"] += AGE_DATA[base["age"]]["base_hp"] * 0.5
             self.effects.append({"x": base["x"], "y": base["y"]-80,
                                  "text": f"LÊN ĐỜI {AGE_DATA[base['age']]['name'].upper()}!", "life": 80,
@@ -1421,11 +1321,8 @@ class AgeOfWarGame(MiniGame):
             enemy_base = self.bases[enemy_team]
             enemies = [e for e in self.units if e.team == enemy_team]
 
-            closest, min_dist = enemy_base, abs(u.x - enemy_base["x"])
-            for e in enemies:
-                d = abs(u.x - e.x)
-                if d < min_dist:
-                    min_dist, closest = d, e
+            closest = min(enemies + [enemy_base], key=lambda e: abs(u.x - (e.x if hasattr(e, 'x') else e["x"])))
+            min_dist = abs(u.x - (closest.x if hasattr(closest, 'x') else closest["x"]))
 
             if min_dist <= u.range:
                 u.action = "attack"
@@ -1433,62 +1330,43 @@ class AgeOfWarGame(MiniGame):
                     u.cd = u.max_cd
                     if u.type in ["sword", "tank", "assa"]:
                         if type(closest) is dict:
-                            closest["hp"] -= u.dmg
+                            closest["hp"] -= u.dmg; self.add_xp(u.team, 4); self.add_xp(enemy_team, 7)
                             cx, cy = closest["x"], closest["y"]
-                            if closest == enemy_base:
-                                self.add_xp(u.team, 4)
-                                self.add_xp(enemy_team, 7)
                         else:
                             closest.hp -= u.dmg
                             cx, cy = closest.x, closest.y
                             
-                        self.effects.append({"x": cx + random.randint(-5, 5), "y": cy-20,
-                                             "text": f"-{int(u.dmg)}", "life": 20,
-                                             "color": "#FFFFFF", "size": 11, "type": "hit_spark"})
+                        self.effects.append({"x": cx + random.randint(-5, 5), "y": cy-20, "text": f"-{int(u.dmg)}", "life": 20, "color": "#FFFFFF", "size": 11, "type": "hit_spark"})
                     else:
-                        self.projectiles.append({
-                            "x": u.x, "y": u.y-15,
-                            "vx": (1 if u.team == "red" else -1)*8,
-                            "team": u.team, "dmg": u.dmg,
-                            "aoe": UNIT_BASE[u.type].get("aoe", False),
-                            "age": u.age,
-                            "target_y": (closest["y"] if type(closest) is dict else closest.y) - 10
-                        })
-                else:
-                    u.cd -= 1
+                        self.projectiles.append({"x": u.x, "y": u.y-15, "vx": (1 if u.team == "red" else -1)*8, "team": u.team, "dmg": u.dmg, "aoe": UNIT_BASE[u.type].get("aoe", False), "age": u.age, "target_y": (closest["y"] if type(closest) is dict else closest.y) - 10})
+                else: u.cd -= 1
             else:
                 u.action = "walk"
                 u.x += (1 if u.team == "red" else -1) * u.speed
-                if u.cd > 0:
-                    u.cd -= 1
+                if u.cd > 0: u.cd -= 1
 
     def update_physics(self):
-        alive = []
+        alive_units = []
         for u in self.units:
             if u.hp > 0:
-                alive.append(u)
+                alive_units.append(u)
             else:
                 killer = "blue" if u.team == "red" else "red"
                 self.add_xp(killer, 5)
                 self.bases[killer]["mana"] += 10
                 self.effects.append({"x": u.x, "y": u.y-20, "text": "+10 💧", "life": 30, "color": "#3498DB", "size": 10})
-        self.units = alive
+        self.units = alive_units
 
-        for proj in self.projectiles[:]:
+        active_proj = []
+        for proj in self.projectiles:
             proj["x"] += proj["vx"]
-            hit = False
-            enemy_team = "blue" if proj["team"] == "red" else "red"
+            hit, enemy_team = False, "blue" if proj["team"] == "red" else "red"
             enemy_base = self.bases[enemy_team]
 
             if abs(proj["x"] - enemy_base["x"]) < 25:
-                enemy_base["hp"] -= proj["dmg"]
-                self.add_xp(proj["team"], 4)
-                if self.app: self.app.play_game_sound("explosion")
-                self.add_xp(enemy_team, 7)
-                self.base_shake[enemy_team] = 8 # Rung màn hình khi nhà bị bắn
-                self.effects.append({"x": proj["x"], "y": enemy_base["y"]-30,
-                                     "text": f"-{int(proj['dmg'])}", "life": 20,
-                                     "color": "yellow", "size": 14, "type": "hit_spark"})
+                enemy_base["hp"] -= proj["dmg"]; self.add_xp(proj["team"], 4); self.add_xp(enemy_team, 7)
+                self.base_shake[enemy_team] = 8
+                self.effects.append({"x": proj["x"], "y": enemy_base["y"]-30, "text": f"-{int(proj['dmg'])}", "life": 20, "color": "yellow", "size": 14, "type": "hit_spark"})
                 hit = True
 
             if not hit:
@@ -1497,27 +1375,23 @@ class AgeOfWarGame(MiniGame):
                         hit = True
                         if proj.get("aoe"):
                             for target in self.units:
-                                self.effects.append({"x": proj["x"], "y": proj.get("target_y", e.y-15), "life": 15, "radius": 20, "type": "explosion"})
                                 if target.team == enemy_team and abs(proj["x"] - target.x) < 40:
                                     target.hp -= proj["dmg"]
-                                    self.effects.append({"x": target.x, "y": target.y-15,
-                                                         "text": f"-{int(proj['dmg'])}", "life": 15,
-                                                         "color": "#FFA500", "size": 10})
+                                    self.effects.append({"x": target.x, "y": target.y-15, "text": f"-{int(proj['dmg'])}", "life": 15, "color": "#FFA500", "size": 10})
+                            self.effects.append({"x": proj["x"], "y": proj.get("target_y", e.y-15), "life": 15, "radius": 20, "type": "explosion"})
                         else:
                             e.hp -= proj["dmg"]
-                            self.effects.append({"x": e.x, "y": e.y-15,
-                                                 "text": f"-{int(proj['dmg'])}", "life": 15,
-                                                 "color": "white", "size": 10, "type": "hit_spark"})
+                            self.effects.append({"x": e.x, "y": e.y-15, "text": f"-{int(proj['dmg'])}", "life": 15, "color": "white", "size": 10, "type": "hit_spark"})
                         break
-            if hit or proj["x"] < 0 or proj["x"] > self.width:
-                self.projectiles.remove(proj)
+            if not hit and 0 <= proj["x"] <= self.width: active_proj.append(proj)
+        self.projectiles = active_proj
 
-        for e in self.effects[:]:
+        active_eff = []
+        for e in self.effects:
             e["life"] -= 1
-            if e.get("type") != "explosion":
-                e["y"] -= 1
-            if e["life"] <= 0:
-                self.effects.remove(e)
+            if e.get("type") != "explosion": e["y"] -= 1
+            if e["life"] > 0: active_eff.append(e)
+        self.effects = active_eff
 
     def draw_world(self):
         self.draw_background()
@@ -1727,7 +1601,7 @@ class StudyTimer:
         self.pomodoro_count = 0
         self.after_id = None
         self.last_tick_time = 0
-        self.sound_enabled = tk.BooleanVar(value=True) # Mặc định bật âm thanh
+        self.session_start_time = None
 
         # Báo thức
         self.alarm_time = None
@@ -1741,8 +1615,6 @@ class StudyTimer:
         self.switch_game("space_shooter")
         self.update_timer_display()
         self.start_alarm_check()
-        
-        self.load_background()
         
         # Bắt sự kiện khi nhấn nút [X] đóng cửa sổ
         self.root.protocol('WM_DELETE_WINDOW', self.hide_window)
@@ -1764,11 +1636,13 @@ class StudyTimer:
         self.mini_btn.pack(side=tk.LEFT, padx=10, pady=15)
         
         total, streak, _ = self.db.get_stats()
-        self.stats_label = ctk.CTkLabel(top_bar, text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên", font=("Segoe UI", 14, "bold"), text_color="#F59E0B")
-        self.stats_label.pack(side=tk.RIGHT, padx=20, pady=15)
+        self.report_btn = ctk.CTkButton(top_bar, text="📊 Báo Cáo Hôm Nay", font=("Segoe UI", 12, "bold"), fg_color=self.card_bg, text_color=self.text_color, hover_color="#475569", width=140, height=30, corner_radius=10, command=self.show_daily_report)
+        self.report_btn.pack(side=tk.RIGHT, padx=(0, 20), pady=15)
+        
+        self.stats_label = ctk.CTkLabel(top_bar, text=f"🔥 Chuỗi: {streak} ngày   •   📚 Tổng: {total} phiên", font=("Segoe UI", 13, "bold"), text_color="#F59E0B")
+        self.stats_label.pack(side=tk.RIGHT, padx=(0, 15), pady=15)
 
         # Main container (dưới taskbar)
-        main_container = ctk.CTkFrame(self.root, fg_color=self.bg_color, corner_radius=0)
         main_container = ctk.CTkFrame(self.root, fg_color="transparent", corner_radius=0)
         main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
@@ -1867,12 +1741,8 @@ class StudyTimer:
         game_top.pack(fill=tk.X, padx=20, pady=(15, 10))
         ctk.CTkLabel(game_top, text="🎮 CHILL MINI GAME", font=("Segoe UI", 14, "bold"), text_color=self.text_color).pack(side=tk.LEFT)
         
-        self.sound_switch = ctk.CTkSwitch(game_top, text="🔊 Âm thanh", variable=self.sound_enabled, font=("Segoe UI", 12))
-        self.sound_switch.pack(side=tk.LEFT, padx=(15, 0))
-        
         self.game_var = tk.StringVar(value="space_shooter")
-        games = ["space_shooter", "age_of_war", "dino_runner", "auto_pong", "auto_snake"]
-        games = ["space_shooter", "age_of_war", "dino_runner", "auto_pong"]
+        games = ["space_shooter", "age_of_war", "snake_game"]
         game_combo = ctk.CTkOptionMenu(game_top, values=games, variable=self.game_var, font=("Segoe UI", 13, "bold"), fg_color=self.card_bg, button_color=self.card_bg, dropdown_fg_color=self.card_bg, width=150, command=self.switch_game)
         game_combo.pack(side=tk.RIGHT)
 
@@ -1881,8 +1751,6 @@ class StudyTimer:
         self.game_canvas = tk.Canvas(gc_container, bg="#0B0C10", highlightthickness=0, bd=0)
         self.game_canvas.pack(expand=True, fill=tk.BOTH)
         self.game_canvas.bind("<Configure>", self.on_game_canvas_resize)
-        self.game_canvas = tk.Canvas(gc_container, width=520, height=320, bg="#0B0C10", highlightthickness=0, bd=0)
-        self.game_canvas.pack(expand=True)  # Không dùng fill=BOTH để giữ cố định size tỷ lệ chuẩn, ép ra giữa
 
         ctk.CTkLabel(game_card, text="Nhìn game tự chơi để mắt được nghỉ ngơi nhé 👀", font=("Segoe UI", 12, "italic"), text_color=self.sub_color).pack(pady=(5, 5))
         
@@ -1892,6 +1760,39 @@ class StudyTimer:
     def on_game_canvas_resize(self, event):
         if self.current_game:
             self.current_game.resize(event.width, event.height)
+
+    def _record_elapsed_time(self):
+        if hasattr(self, 'session_start_time') and self.session_start_time and self.is_running:
+            elapsed = time.time() - self.session_start_time
+            self.db.add_time(self.is_study, elapsed)
+            self.session_start_time = None
+
+    def show_daily_report(self):
+        # Nếu đang chạy, cập nhật thời gian hiện tại vào db
+        if self.is_running and not self.is_paused and hasattr(self, 'session_start_time') and self.session_start_time:
+            elapsed = time.time() - self.session_start_time
+            self.db.add_time(self.is_study, elapsed)
+            self.session_start_time = time.time()
+            
+        study_secs, break_secs = self.db.get_today_time()
+        study_mins = int(study_secs // 60)
+        break_mins = int(break_secs // 60)
+        
+        top = ctk.CTkToplevel(self.root)
+        top.title("Báo Cáo Hôm Nay")
+        top.geometry("350x220")
+        top.configure(fg_color=self.frame_bg)
+        top.attributes('-topmost', True)
+        top.transient(self.root)
+        
+        ctk.CTkLabel(top, text="📊 THỐNG KÊ HÔM NAY", font=("Segoe UI", 18, "bold"), text_color=self.green_accent).pack(pady=(20, 15))
+        
+        frame = ctk.CTkFrame(top, fg_color=self.card_bg, corner_radius=10)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+        
+        ctk.CTkLabel(frame, text=f"📚 Đã học: {study_mins} phút", font=("Segoe UI", 16, "bold"), text_color=self.text_color).pack(pady=(20, 5))
+        ctk.CTkLabel(frame, text=f"☕ Đã nghỉ: {break_mins} phút", font=("Segoe UI", 16, "bold"), text_color=self.sub_color).pack(pady=5)
+
     def load_background(self):
         bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lofi_bg.jpg")
         
@@ -2100,42 +2001,18 @@ class StudyTimer:
         if w <= 1: w = 520
         if h <= 1: h = 320
         
-        w, h = 520, 320
-        if game_key == "dino_runner":
-            game = DinoRunnerGame(self.game_canvas, w, h, self)
-        elif game_key == "age_of_war":
+        if game_key == "age_of_war":
             game = AgeOfWarGame(self.game_canvas, w, h, self)
-        elif game_key == "auto_pong":
-            game = AutoPongGame(self.game_canvas, w, h, self)
-        elif game_key == "auto_snake":
-            game = AutoSnakeGame(self.game_canvas, w, h, self)
-        elif game_key == "auto_aoe":
-            game = AutoAOEGame(self.game_canvas, w, h, self)
         elif game_key == "space_shooter":
             game = AutoSpaceShooterGame(self.game_canvas, w, h, self)
+        elif game_key == "snake_game":
+            game = SnakeGame(self.game_canvas, w, h, self)
         else:
             return
         self.game_map[game_key] = game
         self.current_game = game
         if self.is_running and not self.is_paused and self.is_study:
             self.current_game.start()
-            
-    def play_game_sound(self, s_type):
-        if not self.sound_enabled.get():
-            return
-        def sound_task():
-            try:
-                import winsound
-                if s_type == "eat": winsound.Beep(1200, 100)
-                elif s_type == "jump": winsound.Beep(800, 100)
-                elif s_type == "die": winsound.Beep(300, 300)
-                elif s_type == "hit": winsound.Beep(600, 50)
-                elif s_type == "upgrade": 
-                    winsound.Beep(1000, 100); winsound.Beep(1500, 100)
-                elif s_type == "explosion": winsound.Beep(400, 150)
-            except:
-                pass
-        threading.Thread(target=sound_task, daemon=True).start()
 
     def switch_game(self, game_key):
         self.init_game(game_key)
@@ -2183,6 +2060,7 @@ class StudyTimer:
             play_beep()
 
     def timer_finished(self):
+        self._record_elapsed_time()
         self.is_running = False
         self.start_pause_btn.configure(text="▶ BẮT ĐẦU", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
         if self.current_game:
@@ -2190,7 +2068,11 @@ class StudyTimer:
                 self.current_game.save_state_to_db()
             elif isinstance(self.current_game, AutoSpaceShooterGame):
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
-            self.current_game.stop()
+            elif isinstance(self.current_game, SnakeGame):
+                self.db.set_highscore_if_higher("snake_game", self.current_game.score)
+            # Luôn dừng game khi bộ đếm thời gian kết thúc một phiên
+            if self.current_game:
+                self.current_game.stop()
         if self.is_study:
             # Phát âm thanh báo hiệu khi vừa hết giờ học ở dưới nền
             threading.Thread(target=self.play_chime, daemon=True).start()
@@ -2224,12 +2106,14 @@ class StudyTimer:
         if not self.is_running:
             self.is_running = True
             self.is_paused = False
+            self.session_start_time = time.time()
             self.start_pause_btn.configure(text="⏸ TẠM DỪNG", fg_color=self.red_accent, text_color="#FFFFFF", hover_color="#E11D48")
             self.end_time = time.time() + self.current_time_left
-            if self.is_study and self.current_game:
-                self.current_game.start()
+            if self.is_study and self.current_game: # Nếu đang trong chế độ học, tiếp tục game
+                self.current_game.resume()
             self.countdown()
         elif self.is_running and not self.is_paused:
+            self._record_elapsed_time()
             self.is_paused = True
             self.start_pause_btn.configure(text="▶ TIẾP TỤC", fg_color=self.green_accent, text_color="#000000", hover_color="#059669")
             if self.after_id:
@@ -2239,6 +2123,7 @@ class StudyTimer:
             self.update_timer_display()
         elif self.is_running and self.is_paused:
             self.is_paused = False
+            self.session_start_time = time.time()
             self.start_pause_btn.configure(text="⏸ TẠM DỪNG", fg_color=self.red_accent, text_color="#FFFFFF", hover_color="#E11D48")
             self.end_time = time.time() + self.current_time_left
             if self.is_study and self.current_game:
@@ -2246,6 +2131,7 @@ class StudyTimer:
             self.countdown()
 
     def reset(self):
+        self._record_elapsed_time()
         if self.after_id:
             self.root.after_cancel(self.after_id)
         self.is_running = False
@@ -2260,11 +2146,14 @@ class StudyTimer:
                 self.current_game.save_state_to_db()
             elif isinstance(self.current_game, AutoSpaceShooterGame):
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
+            elif isinstance(self.current_game, SnakeGame):
+                self.db.set_highscore_if_higher("snake_game", self.current_game.score)
             self.current_game.stop()
         self.update_timer_display()
         self.show_notification("↺ Đã đặt lại thời gian")
 
     def skip(self):
+        self._record_elapsed_time()
         if self.after_id:
             self.root.after_cancel(self.after_id)
         self.is_running = False
@@ -2285,13 +2174,18 @@ class StudyTimer:
                 self.current_game.save_state_to_db()
             elif isinstance(self.current_game, AutoSpaceShooterGame):
                 self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
-            self.current_game.stop()
+            elif isinstance(self.current_game, SnakeGame):
+                self.db.set_highscore_if_higher("snake_game", self.current_game.score)
+            # Luôn dừng game khi bộ đếm thời gian được bỏ qua
+            if self.current_game:
+                self.current_game.stop()
         self.last_tick_time = 0
         self.update_timer_display()
         self.show_notification(msg)
 
     def apply_settings(self):
         try:
+            self._record_elapsed_time()
             study = int(self.study_entry.get())
             short = int(self.short_break_entry.get())
             long = int(self.long_break_entry.get())
@@ -2314,7 +2208,11 @@ class StudyTimer:
                     self.current_game.save_state_to_db()
                 elif isinstance(self.current_game, AutoSpaceShooterGame):
                     self.db.save_space_shooter_state(self.current_game.coins, self.current_game.w_lvl, self.current_game.f_lvl, self.current_game.d_lvl, self.current_game.s_lvl)
-                self.current_game.stop()
+            elif isinstance(self.current_game, SnakeGame):
+                self.db.set_highscore_if_higher("snake_game", self.current_game.score)
+                # Luôn dừng game khi cài đặt được áp dụng
+                if self.current_game:
+                    self.current_game.stop()
             self.update_timer_display()
             self.show_notification("✓ Đã lưu cài đặt mới")
         except ValueError:
