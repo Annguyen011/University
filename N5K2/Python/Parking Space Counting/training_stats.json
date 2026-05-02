@@ -1,0 +1,17 @@
+{
+  "svm": {
+    "hyperparameters": {
+      "kernel": "rbf",
+      "C": 1.0,
+      "gamma": "scale"
+    },
+    "metrics": {
+      "train_accuracy": 0.99825,
+      "val_accuracy": 0.99075,
+      "test_accuracy": 0.99075,
+      "test_precision": 0.9880656389855793,
+      "test_recall": 0.9935,
+      "test_f1": 0.9907753677387185
+    }
+  }
+}
