@@ -1,0 +1,32 @@
+{
+  "total_samples": 108400,
+  "splits": {
+    "train": {
+      "total": 76050,
+      "empty": 16546,
+      "occupied": 59504,
+      "empty_percent": 21.76,
+      "occupied_percent": 78.24
+    },
+    "val": {
+      "total": 16131,
+      "empty": 3502,
+      "occupied": 12629,
+      "empty_percent": 21.71,
+      "occupied_percent": 78.29
+    },
+    "test": {
+      "total": 16219,
+      "empty": 3547,
+      "occupied": 12672,
+      "empty_percent": 21.87,
+      "occupied_percent": 78.13
+    }
+  },
+  "class_distribution": {
+    "empty": 23595,
+    "occupied": 84805,
+    "empty_percent": 21.77,
+    "occupied_percent": 78.23
+  }
+}
