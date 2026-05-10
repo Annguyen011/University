@@ -163,3 +163,4 @@ print(f'\n✓ Training stats saved to: training_stats.json')
 print(f'\n✓ Model saved to: {MODEL_SAVE_PATH}')
 print(f'✓ Scaler saved to: {SCALER_SAVE_PATH}')
 print('\nNext step: python main_svm.py')
+# File này đã dư thừa và được gộp vào svm_model.py. Bạn có thể xóa file này một cách an toàn.
