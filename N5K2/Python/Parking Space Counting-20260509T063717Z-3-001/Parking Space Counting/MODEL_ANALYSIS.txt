@@ -1,0 +1,145 @@
+﻿================================================================================
+PHÂN TÍCH CHI TIẾT TỪNG DÒNG CODE CỦA 2 MÔ HÌNH NHẬN DIỆN BÃI ĐỖ XE
+================================================================================
+
+I. MÔ HÌNH TRADITIONAL CV (File: traditional_cv.py)
+
+1. Khởi tạo và lấy Video (Bên trong hàm `main()`):
+- Lấy toạ độ bãi đỗ: Code mở file lưu toạ độ bằng lệnh `with open(...)` 
+  và tải ra mảng `park_positions = pickle.load(f)`. Mảng này chứa các điểm [x, y].
+
+- Mở Video: Code dùng OpenCV mở video thông qua lệnh `cap = cv2.VideoCapture(...)`.
+
+- Đọc từng khung hình: Sử dụng vòng lặp vô hạn `while True:` 
+  và lệnh `ret, frame = cap.read()` để lấy từng bức ảnh ra từ video.
+
+2. Phân tích hình ảnh (Hàm `preprocess_full_frame(frame)`):
+Thay vì xử lý từng ô xe, code mang nguyên bức ảnh lớn `frame` 
+ném vào hàm này để xử lý 1 lần duy nhất cho nhanh:
+
+- Chuyển sang ảnh Xám: `gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)`
+
+- Khử nhiễu (Làm mờ): `blur = cv2.GaussianBlur(gray, (3, 3), 1)`. 
+  Dùng ma trận 3x3 để làm mờ nhẹ, vứt bỏ các sạn trên mặt đường.
+
+- Phân ngưỡng đen trắng (Chính là cốt lõi của Traditional CV): 
+  `thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 16)`
+  Lệnh này biến toàn bộ ảnh thành 2 màu trắng/đen. 
+  Chỗ nào có nếp gấp, có xe, có gờ thì biến thành màu TRẮNG. 
+  Đường nhựa láng mịn biến thành màu ĐEN. Hàm trả về `img_thresh`.
+
+3. Đếm điểm ảnh và Phân loại (Bên trong vòng lặp `for pos in park_positions:`):
+- Cắt ô đỗ xe: `img_crop = img_thresh[y:y+height, x:x+width]` 
+  (Lấy ảnh từ y đến y+19, từ x đến x+40).
+
+- Đếm Pixel Trắng: `count = cv2.countNonZero(img_crop)` 
+  (Đếm xem trong ô nhỏ đó có bao nhiêu hạt màu trắng).
+
+- Tính Tỷ lệ: `ratio = count / full_pixels` 
+  (Lấy số hạt trắng chia cho tổng số pixel của ô là 40x19=760).
+
+- Phân loại Trống / Có xe: Code dùng lệnh điều kiện `if ratio < empty_threshold:` 
+  (với empty_threshold = 0.22). 
+  Nếu tỷ lệ hạt trắng dưới 22% -> Trống (Green), ngược lại là Có xe (Red).
+
+
+================================================================================
+
+II. MÔ HÌNH HỌC MÁY SVM (File: svm_model.py)
+
+1. Cấu trúc mô hình SVM (Bên trong class `ParkingSVM` -> hàm `__init__`):
+- Khởi tạo Thuật toán SVM: `self.model = SVC(kernel='rbf', C=1.0, gamma='scale')`. 
+  Đây là bộ não của mô hình, dùng hàm RBF để bẻ cong không gian nhận diện, 
+  giúp phân tách được các bãi đỗ xe phức tạp.
+
+- Khởi tạo Bộ chuẩn hóa: `self.scaler = StandardScaler()`. 
+  Hàm này giúp đưa các thông số pixel về mặt bằng chung, 
+  tránh việc ảnh quá sáng hoặc quá tối làm AI nhận diện sai.
+
+2. Đọc dữ liệu và Huấn luyện (Hàm `train(self, dataset_dir)`):
+Nếu chưa có file model (pkl), code sẽ chạy hàm này.
+- Đọc ảnh xe: Code quét vào folder 'dataset' bằng lệnh `folder.glob('*.png')`. 
+  Dùng vòng lặp mở từng cái ảnh 40x19 lên bằng `cv2.imread(...)`.
+
+- Trích xuất Vector (Làm phẳng): Cốt lõi của AI nằm ở lệnh `img.flatten()`. 
+  Nó đập nát bức ảnh 2D 40x19 thành một cái thước kẻ dài chứa 760 con số (từ 0-255). 
+  Tống cái thước kẻ này vào mảng `X_train`.
+
+- Chuẩn hoá: `X_train_scaled = self.scaler.fit_transform(X_train)`. 
+  Nó biến 760 con số (0-255) thành dạng số thập phân từ -1 đến 1.
+
+- AI bắt đầu "Học": Lệnh `self.model.fit(X_train_scaled, y_train)` là lúc AI 
+  vắt óc tìm ra quy luật liên hệ giữa dãy số và nhãn (y_train = 0 hoặc 1). 
+  Sau khi học xong, nó lưu lại 2 file não bộ bằng lệnh `joblib.dump()`.
+
+3. Dự đoán thực tế (Hàm `predict(self, img_crop)`):
+Khi Video đang chạy, lấy cái ảnh ô đỗ xe đưa vào hàm này.
+- Ép phẳng lại y như lúc học: `flat_features = img_crop.flatten().reshape(1, -1)`
+
+- Chuẩn hóa: `scaled_features = self.scaler.transform(flat_features)`
+
+- Dự đoán: `return self.model.predict(scaled_features)[0] == 1`. 
+  AI trả ra kết quả 1 (Occupied) hoặc 0 (Empty) ngay lập tức.
+
+4. Chạy Video (Hàm `main()`):
+Khá giống Traditional CV ở việc đọc video `cap.read()` và lấy toạ độ. 
+Tuy nhiên ở bước vòng lặp `for pos in park_positions:`, thay vì đếm pixel, 
+nó cắt BỨC ẢNH CÓ MÀU:
+- `img_crop = frame[y:y+height, x:x+width]`
+
+- Ném vào AI: `is_occupied = svm_system.predict(img_crop)`
+
+- Phân loại dựa theo biến `is_occupied` là True/False.
+
+
+================================================================================
+
+III. SỰ KHÁC BIỆT CỐT LÕI (NHÌN QUA CODE)
+
+1. Cách đánh giá:
+- Traditional CV: Đánh giá bằng lệnh `if ratio < 0.22`. 
+  Bạn CÓ THỂ THAY ĐỔI con số 0.22 này trực tiếp bằng tay trong code. 
+  Nó là một ngưỡng "Cứng".
+
+- SVM: Đánh giá bằng lệnh `self.model.predict(scaled_features)`. 
+  Bạn KHÔNG THỂ biết bên trong hàm predict nó if/else cái gì. 
+  Nó là một ma trận toán học khổng lồ do máy tự lập ra thông qua hàm `fit()`. 
+  Nó là một hộp "Đen".
+
+2. Cách truyền dữ liệu ảnh:
+- Traditional CV: Ném nguyên 1 frame to của Camera qua hàm threshold 1 lần 
+  duy nhất, sau đó mới cắt nhỏ các ô -> Tiết kiệm chu kỳ CPU cực kỳ tốt.
+
+- SVM: Phải cắt từng ô (Crop) từ ảnh Camera gốc. Trăm ô đỗ xe thì phải vòng lặp 
+  chạy hàm `scaler.transform` và `model.predict` hàng trăm lần.
+  -> Chậm hơn Traditional CV (nhưng với máy tính hiện nay thì vẫn chạy mượt).
+
+3. Sự phụ thuộc:
+- Traditional CV: Code tự chạy không phụ thuộc gì ngoài video. 
+  Xóa file python là mất trắng.
+
+- SVM: Phụ thuộc vào file `svm_parking.pkl` (Lưu trọng số/Kinh nghiệm của mô hình).
+
+
+================================================================================
+
+IV. ƯU ĐIỂM VÀ NHƯỢC ĐIỂM
+
+1. Traditional CV
+- Ưu điểm theo code: Code siêu gọn, không thư viện phức tạp. 
+  Tốc độ thực thi chớp nhoáng vì dùng các hàm C++ thuần của OpenCV 
+  (`cv2.countNonZero`).
+
+- Nhược điểm theo code: Ngưỡng `0.22` được hard-code (đóng cứng). 
+  Nếu đổi góc camera quay xa hơn (xe nhỏ lại), số pixel trắng giảm, 
+  con số 0.22 sẽ bị sai lệch, bắt buộc phải code lại.
+
+2. Mô hình SVM
+- Ưu điểm theo code: Tính linh hoạt cực cao. Cấu trúc class `ParkingSVM` cho phép 
+  bạn chỉ cần ném dữ liệu ảnh mới vào hàm `train()`, gọi `fit()` là xong. 
+  Thuật toán tự tìm ra trọng số mới mà lập trình viên không phải quan sát bằng mắt 
+  hay tự mò mẫm các Threshold.
+
+- Nhược điểm theo code: Cần phải code thêm phần tạo dataset (ảnh cắt sẵn), 
+  lưu trữ mảng `y_train` và `X_train` rườm rà ở bước huấn luyện. 
+  Cần import nặng nề thư viện `sklearn`.

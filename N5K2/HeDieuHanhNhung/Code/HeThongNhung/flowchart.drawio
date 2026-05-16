@@ -1,0 +1,295 @@
+<mxfile host="65bd71144e">
+    <diagram name="Chi Tiết Code" id="freertos-code-flow">
+        <mxGraphModel dx="587" dy="349" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="S0" value="Bắt đầu void setup()" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=15;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S1" value="Khởi tạo Serial (115200)&#xa;&amp; Wire I2C (400kHz)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="140" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S2" value="pinMode(LED_XANH)&#xa;pinMode(LED_DO)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="240" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S3" value="Tạo mutexI2C&#xa;&amp; hopThu (Queue 1 slot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="340" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S4" value="Khởi tạo Sensors&#xa;OLED, VL53L0X, ADXL345" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="440" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S5" value="xTaskCreatePinnedToCore&#xa;Tạo 4 Tasks cho hệ thống" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="540" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="S6" value="void loop()&#xa;vTaskDelay(portMAX_DELAY)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="640" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S0" target="S1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S1" target="S2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S2" target="S3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S3" target="S4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S4" target="S5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="S5" target="S6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_0" value="TaskDocCamBien&#xa;(Core 0, Priority 3)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=15;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_1" value="for (;;) {&#xa;// Vòng lặp task" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="140" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_2" value="xSemaphoreTake(mutexI2C)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="240" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_3" value="Đọc VL53L0X &amp; ADXL345" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="340" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_4" value="xSemaphoreGive(mutexI2C)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="440" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_5" value="Tính biến nguyHiem&#xa;&amp; Cập nhật canhBaoNguyHiem" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="540" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_6" value="xQueueOverwrite(hopThu)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="640" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T1_7" value="vTaskDelay(25ms)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="740" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_0" target="T1_1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_1" target="T1_2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_2" target="T1_3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_3" target="T1_4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_4" target="T1_5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_5" target="T1_6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T1_6" target="T1_7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" parent="1" source="T1_7" target="T1_1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="280" y="770"/>
+                            <mxPoint x="280" y="165"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="T2_0" value="TaskHienThiOLED&#xa;(Core 1, Priority 2)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=15;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T2_1" value="Vẽ khung tĩnh 1 lần&#xa;(Không xóa OLED)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="140" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T2_2" value="for (;;) {&#xa;// Vòng lặp task" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="240" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="T2_3" value="xQueueReceive(200ms)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="340" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T2_4" value="Dữ liệu mới có&#xa;khác dữ liệu cũ?" style="rhombus;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="440" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="T2_5" value="xSemaphoreTake(mutexI2C)&#xa;display.print(...)&#xa;display.display()&#xa;xSemaphoreGive(mutexI2C)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="600" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T2_0" target="T2_1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T2_1" target="T2_2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T2_2" target="T2_3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T2_3" target="T2_4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="Có (dirty = true)" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" source="T2_4" target="T2_5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" source="T2_4" target="T2_2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="840" y="490"/>
+                            <mxPoint x="840" y="265"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" parent="1" source="T2_5" target="T2_2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="560" y="640"/>
+                            <mxPoint x="560" y="265"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="T3_0" value="TaskDieuKhienLED&#xa;(Core 1, Priority 1)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=15;" parent="1" vertex="1">
+                    <mxGeometry x="1059.91" y="80" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T3_1" value="for (;;) {&#xa;// Vòng lặp task" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1059.91" y="180" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="T3_2" value="if (canhBaoNguyHiem)" style="rhombus;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1059.91" y="280" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="T3_3" value="ĐỎ Sáng / XANH Tắt&#xa;vTaskDelay(100ms)&#xa;ĐỎ Tắt / Delay 100ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="939.91" y="440" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="T3_4" value="XANH Sáng / ĐỎ Tắt&#xa;vTaskDelay(50ms)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1199.91" y="440" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T3_0" target="T3_1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T3_1" target="T3_2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="Đúng (True)" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" source="T3_2" target="T3_3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="Sai (False)" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" source="T3_2" target="T3_4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" parent="1" source="T3_3" target="T3_1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="899.91" y="480"/>
+                            <mxPoint x="899.91" y="205"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="28" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" parent="1" source="T3_4" target="T3_1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1419.91" y="480"/>
+                            <mxPoint x="1419.91" y="205"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="T4_0" value="TaskGiamSat&#xa;(Core 1, Priority 3)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=15;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T4_1" value="for (;;) {&#xa;// Vòng lặp task" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="140" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="T4_2" value="vTaskDelay(3000ms)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="240" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="T4_3" value="Serial.printf(Heap)&#xa;Serial.printf(Trạng thái)&#xa;Serial.printf(Stack)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="340" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T4_0" target="T4_1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T4_1" target="T4_2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="T4_2" target="T4_3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" parent="1" source="T4_3" target="T4_1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1720" y="380"/>
+                            <mxPoint x="1720" y="165"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="33" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#4a86e8;strokeWidth=2;entryX=0.5;entryY=0;exitX=0;exitY=0.5;" parent="1" source="S5" target="T1_0" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="570"/>
+                            <mxPoint x="20" y="15"/>
+                            <mxPoint x="420" y="15"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="34" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#4a86e8;strokeWidth=2;entryX=0.5;entryY=0;exitX=0;exitY=0.5;" parent="1" source="S5" target="T2_0" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="570"/>
+                            <mxPoint x="20" y="15"/>
+                            <mxPoint x="700" y="15"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="35" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#4a86e8;strokeWidth=2;entryX=0.5;entryY=0;exitX=0;exitY=0.5;" parent="1" source="S5" target="T3_0" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="570"/>
+                            <mxPoint x="20" y="15"/>
+                            <mxPoint x="1160" y="15"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="36" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#4a86e8;strokeWidth=2;entryX=0.5;entryY=0;exitX=0;exitY=0.5;" parent="1" source="S5" target="T4_0" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="570"/>
+                            <mxPoint x="20" y="15"/>
+                            <mxPoint x="1580" y="15"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="P_TITLE" value="CHI TIẾT CƠ CHẾ CƯỚP QUYỀN (PREEMPTION) GIỮA 2 TASK TRÊN CÙNG CORE 1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=16;fontColor=#B85450;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="860" width="800" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="P1" value="TaskDieuKhienLED (Pri 1)&#xa;Đang chiếm CPU (Running)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="920" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P2" value="Tín hiệu: Có dữ liệu mới&#xa;vào Queue (hopThu)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="1020" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P3" value="FreeRTOS ngắt Task LED&#xa;(Lưu trạng thái - Context Save)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="920" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P4" value="TaskHienThiOLED (Pri 2)&#xa;cướp quyền CPU &amp; Thực thi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="620" y="920" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P5" value="Task OLED xử lý xong,&#xa;chờ nhận Queue (Blocked)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="920" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P6" value="FreeRTOS khôi phục Task LED&#xa;(Context Restore) &amp; Chạy tiếp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="1140" y="920" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="P_E1" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P1" target="P3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="P_E2" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;dashed=1;strokeColor=#d79b00;" parent="1" source="P2" target="P3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="P_E3" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P3" target="P4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="P_E4" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P4" target="P5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="P_E5" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P5" target="P6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
