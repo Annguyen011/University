@@ -1,0 +1,42 @@
+<mxfile host="Electron" modified="2023-10-27T00:00:00.000Z" agent="Mozilla/5.0" version="22.0.0" type="device">
+  <diagram id="svm_diagram" name="SVM Inference">
+    <mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <mxCell id="title" value="MÔ HÌNH HỌC MÁY (SVM Inference)" style="text;html=1;fontStyle=1;fontSize=18;fontColor=#6c8ebf;align=center;" vertex="1" parent="1"><mxGeometry x="240" y="10" width="340" height="40" as="geometry"/></mxCell>
+        
+        <mxCell id="S1" value="Bắt đầu &amp;amp; Load SVM Model + Scaler" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1"><mxGeometry x="314" y="60" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="S2" value="Đọc Frame Video (while True)" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1" vertex="1" parent="1"><mxGeometry x="314" y="160" width="200" height="50" as="geometry" /></mxCell>
+        <mxCell id="S3" value="Lặp qua từng ô đỗ (for pos)" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1" vertex="1" parent="1"><mxGeometry x="314" y="250" width="200" height="50" as="geometry" /></mxCell>
+        <mxCell id="S4" value="Cắt vùng đỗ xe (Crop 40x19)&#xa;&amp;amp; Chuyển thành ảnh Xám" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="314" y="340" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="S5" value="Ép phẳng (Flatten)&#xa;thành mảng 1x760 pixels" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="314" y="440" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="S6" value="Chuẩn hóa (Scaler)&#xa;&amp;amp; Dự đoán (SVM Predict)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1"><mxGeometry x="314" y="540" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="S7" value="Kết quả == 1 ?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1"><mxGeometry x="314" y="640" width="200" height="80" as="geometry" /></mxCell>
+        <mxCell id="S8" value="Trống (Empty) - Box Xanh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="140" y="760" width="160" height="60" as="geometry" /></mxCell>
+        <mxCell id="S9" value="Có xe (Occupied) - Box Đỏ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="540" y="760" width="160" height="60" as="geometry" /></mxCell>
+        <mxCell id="S10" value="Vẽ Box lên Frame gốc" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="314" y="860" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="S11" value="Hiển thị Video (cv2.imshow)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="600" y="245" width="180" height="60" as="geometry" /></mxCell>
+        
+        <mxCell id="ES1" edge="1" parent="1" source="S1" target="S2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES2" edge="1" parent="1" source="S2" target="S3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES3" edge="1" parent="1" source="S3" target="S4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES4" edge="1" parent="1" source="S4" target="S5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES5" edge="1" parent="1" source="S5" target="S6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES6" edge="1" parent="1" source="S6" target="S7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        
+        <mxCell id="ES7" value="Sai (Kết quả = 0)" edge="1" parent="1" source="S7" target="S8"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="220" y="680" /></Array></mxGeometry></mxCell>
+        <mxCell id="ES8" value="Đúng (Kết quả = 1)" edge="1" parent="1" source="S7" target="S9"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="620" y="680" /></Array></mxGeometry></mxCell>
+        
+        <mxCell id="ES9" edge="1" parent="1" source="S8" target="S10"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="220" y="890" /></Array></mxGeometry></mxCell>
+        <mxCell id="ES10" edge="1" parent="1" source="S9" target="S10"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="620" y="890" /></Array></mxGeometry></mxCell>
+        
+        <mxCell id="ES11" value="Lặp ô tiếp theo" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=1;" edge="1" parent="1" source="S10" target="S3"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="100" y="890" /><mxPoint x="100" y="275" /></Array></mxGeometry></mxCell>
+        
+        <mxCell id="ES12" value="Hết các ô" style="fontStyle=1" edge="1" parent="1" source="S3" target="S11"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ES13" value="Đọc Frame tiếp" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=1;" edge="1" parent="1" source="S11" target="S2"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="690" y="185" /></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

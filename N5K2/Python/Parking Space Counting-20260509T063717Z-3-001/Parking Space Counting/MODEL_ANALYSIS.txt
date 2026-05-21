@@ -143,3 +143,6 @@ IV. ƯU ĐIỂM VÀ NHƯỢC ĐIỂM
 - Nhược điểm theo code: Cần phải code thêm phần tạo dataset (ảnh cắt sẵn), 
   lưu trữ mảng `y_train` và `X_train` rườm rà ở bước huấn luyện. 
   Cần import nặng nề thư viện `sklearn`.
+
+  parking_flowchart.drawio
+  

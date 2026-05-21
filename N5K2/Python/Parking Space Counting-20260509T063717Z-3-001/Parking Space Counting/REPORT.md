@@ -300,5 +300,3 @@ Dữ liệu thu được trong quá trình huấn luyện cho thấy mô hình k
 3. **Libraries**: OpenCV, scikit-learn, TensorFlow/Keras
 
 ---
-
-*Báo cáo được tạo tự động bởi `generate_report.py` - 19/12/2025 11:45:23*

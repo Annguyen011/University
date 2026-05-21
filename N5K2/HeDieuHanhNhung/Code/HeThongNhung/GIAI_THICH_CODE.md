@@ -1,23 +1,21 @@
 # GIẢI THÍCH CHI TIẾT MÃ NGUỒN DỰ ÁN (main.cpp)
 
-Tài liệu này sẽ giải thích chi tiết từng phần trong file `src/main.cpp` để giúp những người mới bắt đầu có thể hiểu rõ cách hoạt động của hệ thống, đặc biệt là các khái niệm liên quan đến FreeRTOS.
+Tài liệu này giải thích chi tiết **từng dòng lệnh một** trong file `src/main.cpp`. Tài liệu được thiết kế đặc biệt dành cho người mới bắt đầu, đảm bảo không viết tắt, không bỏ sót bất kỳ chi tiết nào để bạn có thể hiểu cặn kẽ cách hệ thống và FreeRTOS hoạt động.
 
 ---
 
-## PHẦN 1: KHAI BÁO VÀ CẤU HÌNH (Dòng 1-70)
-
-Đây là phần khởi đầu của chương trình, nơi chúng ta "nhập khẩu" các thư viện cần thiết, định nghĩa các hằng số và khai báo các biến toàn cục.
+## PHẦN 1: KHAI BÁO VÀ CẤU HÌNH
 
 ### 1.1. Bao gồm thư viện (`#include`)
 
 ```cpp
-#include <Arduino.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
-#include <Adafruit_VL53L0X.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_ADXL345_U.h>
+#include <Arduino.h>            // Thư viện lõi của Arduino, cung cấp các hàm cơ bản như pinMode, analogWrite, delay...
+#include <Wire.h>               // Thư viện giao tiếp I2C (sử dụng 2 dây SDA và SCL) để kết nối vi điều khiển với cảm biến/màn hình
+#include <Adafruit_GFX.h>       // Thư viện đồ họa cốt lõi của hãng Adafruit (cung cấp các lệnh in chữ, vẽ hình...)
+#include <Adafruit_SH110X.h>    // Thư viện driver điều khiển riêng cho dòng màn hình OLED sử dụng chip SH1106G
+#include <Adafruit_VL53L0X.h>   // Thư viện driver điều khiển cảm biến khoảng cách bằng laser VL53L0X
+#include <Adafruit_Sensor.h>    // Thư viện chuẩn hóa cấu trúc dữ liệu cho các cảm biến của Adafruit giúp code đồng nhất
+#include <Adafruit_ADXL345_U.h> // Thư viện driver điều khiển cảm biến gia tốc 3 trục ADXL345
 ```
 
 - **`<Arduino.h>`**: Thư viện cốt lõi của Arduino, cung cấp các hàm cơ bản như `pinMode`, `digitalWrite`, `delay`, v.v.
@@ -35,7 +33,6 @@ Tài liệu này sẽ giải thích chi tiết từng phần trong file `src/mai
 ```cpp
 #define PIN_LED_XANH 18
 #define PIN_LED_DO 19
-#define DO_SANG               15        // PWM 0-255
 
 #define NGUONG_KHOANG_CACH  150       // mm
 #define NGUONG_GIA_TOC      5.0f      // m/s²
@@ -147,40 +144,98 @@ void TaskDocCamBien(void* pv) {
 - `xQueueOverwrite`: Nếu hộp thư đã có thư cũ, hàm này sẽ vứt thư cũ đi và thay bằng thư mới. Điều này đảm bảo Task OLED luôn nhận được dữ liệu mới nhất.
 - `vTaskDelay`: Hàm này không giống `delay()` thông thường. Nó sẽ "ru ngủ" Task hiện tại và nhường CPU cho các Task khác chạy.
 
+- **Giải thích chi tiết các hàm FreeRTOS trong Task:**
+  - `xSemaphoreTake(xSemaphore, xBlockTime)`: Hàm yêu cầu cấp quyền sử dụng (lấy) Mutex/Semaphore.
+    - `xSemaphore` (`mutexI2C`): Tên biến Mutex mà Task muốn lấy.
+    - `xBlockTime` (`portMAX_DELAY`): Thời gian Task chịu chờ nếu Mutex đang bị Task khác chiếm giữ. `portMAX_DELAY` có nghĩa là chờ vô thời hạn cho đến khi lấy được mới thôi.
+  - `xSemaphoreGive(xSemaphore)`: Hàm trả lại Mutex sau khi đã dùng xong tài nguyên chung.
+    - `xSemaphore` (`mutexI2C`): Tên biến Mutex muốn trả lại.
+  - `xQueueOverwrite(xQueue, pvItemToQueue)`: Ghi dữ liệu vào hàng đợi (chỉ áp dụng với hàng đợi có độ dài bằng 1). Nó sẽ ghi đè dữ liệu mới nhất bất chấp Queue đang đầy.
+    - `xQueue` (`hopThu`): Tên biến hàng đợi muốn ghi dữ liệu vào.
+    - `pvItemToQueue` (`&duLieu`): Con trỏ trỏ tới vùng nhớ chứa dữ liệu cần gửi đi.
+  - `vTaskDelay(xTicksToDelay)`: Đưa Task vào trạng thái "Block" (ngủ) một thời gian để nhường CPU cho Task khác.
+    - `xTicksToDelay` (`pdMS_TO_TICKS(CHU_KY_CAM_BIEN_MS)`): Số lượng "tick" (nhịp đồng hồ RTOS) cần ngủ. Hàm macro `pdMS_TO_TICKS(ms)` giúp tự động quy đổi từ mili-giây sang số tick một cách chính xác.
+
 ### 2.2. Task 2: `TaskHienThiOLED` (Hiển thị OLED)
 
 Task này chạy trên **Core 1** với **mức ưu tiên 2**. Nhiệm vụ của nó là hiển thị thông tin lên màn hình một cách thông minh.
 
 ```cpp
 void TaskHienThiOLED(void* pv) {
-  DuLieuCamBien cur  = {}; // Dữ liệu hiện tại
-  DuLieuCamBien prev = {9998, ...}; // Dữ liệu của lần vẽ trước
+  DuLieuCamBien cur  = {};                                // Biến chứa dữ liệu mới nhất lấy từ Queue
+  DuLieuCamBien prev = {9998, 0, 0, 0, false};            // Biến lịch sử để so sánh. Khởi tạo 9998 để ép khác biệt ở vòng lặp đầu tiên.
 
-  // ... Vẽ khung tĩnh cho màn hình 1 lần duy nhất ...
+  // --- Vẽ khung tĩnh cho màn hình 1 lần duy nhất ---
+  display.clearDisplay();                    // Xóa sạch bộ đệm hiển thị
+  display.setTextColor(SH110X_WHITE);        // Cài đặt màu chữ trắng
+  display.setTextSize(1);                    // Font chữ tiêu chuẩn
+  display.setCursor(0, 30);  display.print("Cach:");  // In các chữ tĩnh không bao giờ thay đổi
+  display.setCursor(0, 42);  display.print("X:");
+  display.setCursor(43, 42); display.print("Y:");
+  display.setCursor(86, 42); display.print("Z:");
+  display.display();                         // Gọi hàm đẩy dữ liệu chữ tĩnh này lên màn hình
+
+  char buf[16];                              // Mảng buffer dùng chứa chuỗi sau khi định dạng các con số
 
   for (;;) {
-    // 1. Chờ nhận dữ liệu từ hộp thư, tối đa 200ms
+    // 1. Chờ nhận dữ liệu từ hộp thư (tối đa 200ms), nếu không có dữ liệu thì bỏ qua và lặp lại
     if (xQueueReceive(hopThu, &cur, pdMS_TO_TICKS(200)) != pdPASS) continue;
 
-    bool dirty = false; // Biến cờ "bẩn"
+    bool dirty = false; // Biến cờ "bẩn". Đánh dấu nếu có ít nhất 1 thông số thay đổi cần vẽ lại.
 
-    // 2. Thuật toán "Dirty Check"
+    // 2. Thuật toán "Dirty Check": So sánh từng phần tử của cur (mới) và prev (cũ)
+    // --- Kiểm tra trạng thái nguy hiểm ---
     if (cur.nguyHiem != prev.nguyHiem) {
-      // ... chỉ vẽ lại dòng trạng thái ...
-      dirty = true;
+      xSemaphoreTake(mutexI2C, portMAX_DELAY);           // Khóa bus I2C
+      display.setTextSize(2);                            // Font to để cảnh báo
+      display.setTextColor(SH110X_WHITE, SH110X_BLACK);  // Chữ TRẮNG nền ĐEN: Bí quyết để "xóa đè" vùng chữ cũ mà không cần gọi clearDisplay() làm nháy màn hình.
+      display.setCursor(0, 0);                           // Dời trỏ chuột lên góc trái trên
+      display.print(cur.nguyHiem ? "VA CHAM! " : "AN TOAN  "); // Dùng toán tử 3 ngôi. Lưu ý các khoảng trắng thừa "  " để ghi đè sạch các chữ trước đó.
+      xSemaphoreGive(mutexI2C);                          // Nhả bus I2C
+      dirty = true;                                      // Có thay đổi, bật cờ
     }
-    if (cur.khoangCach != prev.khoangCach) {
-      // ... chỉ vẽ lại dòng khoảng cách ...
-      dirty = true;
-    }
-    // ... tương tự cho các thông số khác ...
 
-    // 3. Chỉ cập nhật màn hình vật lý khi có sự thay đổi
-    if (dirty) {
+    // --- Kiểm tra khoảng cách ---
+    if (cur.khoangCach != prev.khoangCach) {
       xSemaphoreTake(mutexI2C, portMAX_DELAY);
-      display.display(); // Gửi buffer lên màn hình
+      display.setTextSize(1);
+      display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+      display.setCursor(30, 30);
+      if (cur.khoangCach > KHOANG_CACH_TOI_DA) {
+        printFixed("Qua xa    ", 9);                     // Hàm tiện ích in chuỗi 9 ký tự, tự bù khoảng trắng
+      } else {
+        snprintf(buf, sizeof(buf), "%4dmm", cur.khoangCach); // snprintf: định dạng số nguyên `cur.khoangCach` thành chuỗi chiếm đúng 4 ký tự `%4d` kèm chữ `mm`, lưu vào `buf`
+        display.print(buf);                              // In ra màn hình buffer vừa định dạng
+      }
       xSemaphoreGive(mutexI2C);
-      nhipOLED++;
+      dirty = true;
+    }
+
+    // --- Kiểm tra gia tốc 3 trục (X, Y, Z) ---
+    if (cur.giaTocX != prev.giaTocX || cur.giaTocY != prev.giaTocY || cur.giaTocZ != prev.giaTocZ) {
+      xSemaphoreTake(mutexI2C, portMAX_DELAY);
+      display.setTextSize(1);
+      display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+
+      display.setCursor(13, 42); // Nhảy tới tọa độ trục X
+      snprintf(buf, sizeof(buf), "%-4d", cur.giaTocX); display.print(buf); // %-4d: Căn lề trái, chiếm 4 khoảng trống
+
+      display.setCursor(56, 42); // Nhảy tới tọa độ trục Y
+      snprintf(buf, sizeof(buf), "%-4d", cur.giaTocY); display.print(buf);
+
+      display.setCursor(99, 42); // Nhảy tới tọa độ trục Z
+      snprintf(buf, sizeof(buf), "%-4d", cur.giaTocZ); display.print(buf);
+
+      xSemaphoreGive(mutexI2C);
+      dirty = true;
+    }
+
+    // 3. Bước chốt: Chỉ gọi hàm vật lý đẩy khung hình (buffer) nếu cờ dirty = true
+    if (dirty) {
+      xSemaphoreTake(mutexI2C, portMAX_DELAY); // Lệnh display() truyền hơn 1024 bytes qua I2C nên cực kỳ cần khóa bảo vệ
+      display.display();                       // Thực sự "vẽ" bộ đệm lên màn hình hiển thị
+      xSemaphoreGive(mutexI2C);
+      nhipOLED++;                              // Tăng biến đếm để báo hiệu cho Watchdog (Task Giám sát) biết OLED không bị treo
     }
 
     // 4. Lưu lại dữ liệu vừa vẽ để so sánh cho lần sau
@@ -197,13 +252,18 @@ Task đơn giản nhất, chạy trên **Core 1** với **mức ưu tiên thấp
 ```cpp
 void TaskDieuKhienLED(void* pv) {
   for (;;) {
-    if (canhBaoNguyHiem) {
-      // Chớp tắt đèn đỏ
-    } else {
-      // Bật đèn xanh, tắt đèn đỏ
+    if (canhBaoNguyHiem) {                      // Nếu cờ cảnh báo đang BẬT (có nguy hiểm)
+      analogWrite(PIN_LED_XANH, 0);             // Tắt LED Xanh
+      analogWrite(PIN_LED_DO, DO_SANG);         // Bật sáng LED Đỏ (độ sáng theo mức PWM)
+      vTaskDelay(pdMS_TO_TICKS(CHU_KY_NHAY_MS));// Tạm dừng 100ms
+      analogWrite(PIN_LED_DO, 0);               // Tắt LED Đỏ
+      vTaskDelay(pdMS_TO_TICKS(CHU_KY_NHAY_MS));// Tạm dừng 100ms -> Tạo hiệu ứng nhấp nháy khẩn cấp liên tục
+    } else {                                    // Nếu AN TOÀN
+      analogWrite(PIN_LED_XANH, DO_SANG);       // Giữ LED Xanh sáng cố định
+      analogWrite(PIN_LED_DO, 0);               // Đảm bảo LED Đỏ tắt
+      vTaskDelay(pdMS_TO_TICKS(50));            // Ngủ ngắn 50ms để nhanh chóng quay lại vòng lặp và bắt sự kiện khẩn cấp
     }
-    nhipLED++;
-    // ... vTaskDelay ...
+    nhipLED++;                                  // Tăng nhịp đếm báo hiệu Task này vẫn đang sống
   }
 }
 ```

@@ -83,7 +83,7 @@ Do I2C Bus là tài nguyên dùng chung duy nhất cho cả 3 thiết bị phầ
 
 ### 4.1. Kết quả đạt được
 - Hệ thống đã hoạt động ổn định đúng như thiết kế: Nhận diện khoảng cách và độ nghiêng với độ trễ phản hồi tính bằng mili-giây.
-- Màn hình OLED hiển thị mượt mà không bị giật lag, giao diện trực quan gồm các thông số Khoảng cách, Tọa độ X-Y-Z và thông số RAM theo thời gian thực.
+- Màn hình OLED hiển thị mượt mà không bị giật lag, giao diện trực quan gồm các thông số Khoảng cách, Tọa độ X-Y-Z theo thời gian thực.
 - Đèn LED cảnh báo chớp nháy ngay lập tức (không bị nghẽn) khi xuất hiện tác động từ môi trường.
 
 ### 4.2. Đánh giá hiệu năng hệ thống
@@ -93,4 +93,3 @@ Nhờ kiến trúc FreeRTOS, hệ thống đạt hiệu suất cao:
 - **Bộ nhớ (RAM):** Thông qua Task Giám Sát ghi nhận được lượng Free Heap luôn duy trì ổn định, không có hiện tượng rò rỉ bộ nhớ (Memory Leak) sau thời gian dài chạy liên tục.
 
 ---
-
