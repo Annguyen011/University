@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Quiz Chapter 1: Introduction to Operating Systems</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; background: #f0f4f8; margin: 0; padding: 20px; color: #1a2c3a; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow: hidden; padding: 20px 24px 32px; }
+        h1 { font-size: 1.9rem; margin-top: 0; margin-bottom: 0.25rem; color: #0a4b6e; border-left: 6px solid #0a4b6e; padding-left: 20px; }
+        .sub { color: #4b6f86; margin-bottom: 28px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; padding-left: 26px; }
+        .controls { text-align: right; margin-bottom: 20px; }
+        .action-btn { padding: 8px 16px; background-color: #2c7da0; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: 0.2s; }
+        .action-btn:hover { background-color: #1f5e7a; }
+        .question-card { background: #ffffff; border-radius: 20px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e4edf2; transition: all 0.1s ease; }
+        .question-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 14px; color: #0b2b3b; }
+        .options { display: flex; flex-direction: column; gap: 10px; padding-left: 8px; }
+        .option { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 8px 12px; border-radius: 40px; background: #f9fafc; transition: background 0.2s; border: 1px solid #e2edf2; }
+        .option:hover { background: #eef3fa; }
+        input[type="radio"] { width: 18px; height: 18px; accent-color: #2c7da0; margin: 0; cursor: pointer; }
+        .option label { flex: 1; cursor: pointer; font-weight: normal; color: #1e4a6e; font-size: 0.95rem; line-height: 1.4; }
+        .submit-btn { background: #2c7da0; border: none; color: white; font-size: 1.2rem; font-weight: bold; padding: 14px 28px; border-radius: 48px; cursor: pointer; margin: 28px 0 20px; width: 100%; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .submit-btn:hover { background: #1f5e7a; transform: scale(0.98); }
+        .result-area { background: #e9f3f7; border-radius: 28px; padding: 18px 24px; margin-top: 15px; display: none; border-left: 8px solid #2c7da0; }
+        .score { font-size: 1.6rem; font-weight: bold; color: #155f7c; }
+        .answer-review { margin-top: 20px; max-height: 450px; overflow-y: auto; background: #ffffffd9; border-radius: 20px; padding: 8px 12px; }
+        .review-item { border-bottom: 1px solid #dce7ef; padding: 12px 8px; }
+        .correct-ans { color: #1f8a4c; font-weight: 500; }
+        .user-choice { color: #b45353; }
+        footer { text-align: center; margin-top: 25px; font-size: 0.75rem; color: #6c8d9e; }
+        @media (max-width: 650px) { .container { padding: 16px; } .question-card { padding: 14px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📘 Chapter 1: Introduction to Operating Systems</h1>
+    <div class="sub">✅ 30 multiple-choice questions – Choose your answer, then click "Submit" to see the score and explanation.</div>
+
+    <div class="controls">
+        <button class="action-btn" id="shuffleBtn">🔀 Shuffle Questions</button>
+    </div>
+
+    <div id="questions-container"></div>
+
+    <button class="submit-btn" id="submitBtn">📬 SUBMIT & VIEW ANSWERS</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Based on Chapter 1 – Introduction (OS definition, history, hardware, concepts, system calls, OS structures)</footer>
+</div>
+
+<script>
+    const questions = [
+        { text: "What is an Operating System?", options: ["The only software running on the computer", "An intermediary program between the user and hardware", "Hardware that controls the CPU", "A high-level programming language"], correct: 1 },
+        { text: "According to the 'extended machine' view, what is the role of an OS?", options: ["Hides complex hardware details, creating an easy-to-use virtual machine", "Increases the CPU processing speed", "Provides a compiler", "Manages databases"], correct: 0 },
+        { text: "What technology was used in the first generation of computers (1945–1955)?", options: ["Transistors", "Integrated Circuits (IC)", "Vacuum tubes", "Microprocessors"], correct: 2 },
+        { text: "Which operating system is typical of the second generation (1955–1965)?", options: ["Windows 95", "UNIX", "FMS (Fortran Monitor System)", "OS/360"], correct: 2 },
+        { text: "What is a prominent feature of the third generation (1965–1980)?", options: ["Batch processing", "Multiprogramming and time-sharing", "Graphical User Interface (GUI)", "Embedded OS"], correct: 1 },
+        { text: "Which of the following belongs to mainframe operating systems?", options: ["Windows 10", "OS/390", "Android", "VxWorks"], correct: 1 },
+        { text: "A Real-time OS is characterized by:", options: ["Supporting multiple users", "Response time being the key factor", "Command-line interface", "Running on smart cards"], correct: 1 },
+        { text: "Which CPU mode allows the execution of privileged instructions?", options: ["User mode", "Kernel mode", "Real mode", "Protected mode"], correct: 1 },
+        { text: "When a program makes a system call, the CPU transitions from:", options: ["Kernel mode to user mode", "User mode to kernel mode", "User mode to idle mode", "Kernel mode to supervisor mode"], correct: 1 },
+        { text: "What is the purpose of the pipeline technique in CPUs?", options: ["Increases memory capacity", "Increases instruction processing speed by performing multiple stages concurrently", "Reduces power consumption", "Expands the instruction set"], correct: 1 },
+        { text: "Two special registers used to protect a process's memory space are:", options: ["Program Counter and Stack Pointer", "Base register and Limit register", "Data register and Address register", "Control register and Status register"], correct: 1 },
+        { text: "Which of the following is read-only memory and often contains the BIOS?", options: ["RAM", "Cache", "ROM", "CMOS"], correct: 2 },
+        { text: "DMA (Direct Memory Access) is used to:", options: ["Accelerate the CPU", "Allow I/O devices to transfer data directly to memory without the CPU", "Manage virtual memory", "Store system configurations"], correct: 1 },
+        { text: "Which OS component is responsible for process creation/destruction, synchronization, and deadlock prevention?", options: ["File management", "Memory management", "Process management", "I/O management"], correct: 2 },
+        { text: "A deadlock occurs when:", options: ["A process uses the CPU for too long", "Two or more processes each hold a resource and wait for the other's resource", "Memory is insufficient", "The system shuts down unexpectedly"], correct: 1 },
+        { text: "What does the `fork()` system call do in UNIX?", options: ["Creates a child process identical to the parent process", "Terminates a process", "Reads data from a file", "Changes the working directory"], correct: 0 },
+        { text: "To completely replace the current process's content with a new program, we use the system call:", options: ["waitpid()", "exit()", "execve()", "kill()"], correct: 2 },
+        { text: "In POSIX, the system call used to create a new directory is:", options: ["create_dir()", "mkdir()", "newdir()", "rmdir()"], correct: 1 },
+        { text: "In the Win32 API, which combination is equivalent to `fork()` + `execve()` in UNIX?", options: ["CreateProcess()", "WaitForSingleObject()", "ReadFile()", "SetCurrentDirectory()"], correct: 0 },
+        { text: "A monolithic OS architecture is characterized by:", options: ["Being divided into layers, each layer calling only the one below", "All system services residing in a single block without clear module separation", "A tiny microkernel, with services running in user space", "Full hardware virtualization"], correct: 1 },
+        { text: "The MS-DOS operating system is a typical example of which architecture?", options: ["Layered", "Virtual machine", "Monolithic", "Client-server"], correct: 2 },
+        { text: "The THE (Technische Hogeschool Eindhoven) OS model is famous for its:", options: ["Virtual machine architecture", "Layered system architecture", "Microkernel architecture", "Exokernel architecture"], correct: 1 },
+        { text: "In the client-server (microkernel) model, communication between main modules in user space is done via:", options: ["Shared memory", "Message passing", "Global variables", "Hardware interrupts"], correct: 1 },
+        { text: "The prefix 'Mega' in the metric system corresponds to:", options: ["10³", "10⁶", "10⁹", "10¹²"], correct: 1 },
+        { text: "How many bytes is a 'Giga' (in decimal)?", options: ["1 million", "1 billion", "1 trillion", "1 quadrillion"], correct: 1 },
+        { text: "Which of the following belongs to the server operating system category?", options: ["Windows Server", "iOS", "VxWorks", "OS/360"], correct: 0 },
+        { text: "The main benefit of virtual machine architecture is:", options: ["Higher processing speed", "Each user gets the illusion of owning a dedicated computer", "Memory savings", "Easier driver development"], correct: 1 },
+        { text: "Which OS component manages mapping files onto secondary storage and data backups?", options: ["Process management", "File management", "Protection and security", "Secondary storage management"], correct: 1 },
+        { text: "In the memory hierarchy, which type of memory has the fastest speed?", options: ["Hard disk", "RAM", "Cache", "Register"], correct: 3 },
+        { text: "When a program calls the `printf()` function in C, it eventually leads to which system call in UNIX?", options: ["read()", "write()", "open()", "lseek()"], correct: 1 }
+    ];
+
+    // Shuffle answers for each question
+    questions.forEach(q => {
+        let opts = q.options.map((text, idx) => ({text, isCorrect: idx === q.correct}));
+        for (let i = opts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [opts[i], opts[j]] = [opts[j], opts[i]];
+        }
+        q.options = opts.map(o => o.text);
+        q.correct = opts.findIndex(o => o.isCorrect);
+    });
+
+    let currentQuestions = [...questions];
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+    
+    // Shuffle questions initially
+    shuffleArray(currentQuestions);
+
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        currentQuestions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            
+            const qText = document.createElement('div');
+            qText.className = 'question-text';
+            qText.innerHTML = `${idx + 1}. ${q.text}`;
+            card.appendChild(qText);
+
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+
+            q.options.forEach((opt, optIdx) => {
+                const optId = `q${idx}_opt${optIdx}`;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${idx}`;
+                radio.value = optIdx;
+                radio.id = optId;
+
+                const label = document.createElement('label');
+                label.htmlFor = optId;
+                label.textContent = `${String.fromCharCode(65+optIdx)}. ${opt}`;
+
+                optionDiv.appendChild(radio);
+                optionDiv.appendChild(label);
+                optionsDiv.appendChild(optionDiv);
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    function getUserAnswers() {
+        const answers = [];
+        for (let i = 0; i < currentQuestions.length; i++) {
+            const radios = document.querySelectorAll(`input[name="question${i}"]`);
+            let selected = null;
+            for (let r of radios) { if (r.checked) { selected = parseInt(r.value); break; } }
+            answers.push(selected);
+        }
+        return answers;
+    }
+
+    function showResults() {
+        const userAnswers = getUserAnswers();
+        let correctCount = 0;
+        const reviewItems = [];
+
+        for (let i = 0; i < currentQuestions.length; i++) {
+            const q = currentQuestions[i];
+            const userChoice = userAnswers[i];
+            const isCorrect = (userChoice !== null && userChoice === q.correct);
+            if (isCorrect) correctCount++;
+
+            let userLetter = userChoice !== null ? String.fromCharCode(65+userChoice) : "❌ Not selected";
+            let correctLetter = String.fromCharCode(65+q.correct);
+            let statusText = isCorrect ? "✅ Correct" : "❌ Incorrect";
+
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Q${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Your choice: ${userLetter} ${userChoice !== null ? q.options[userChoice] : ''}</span><br/>
+                    <span class="correct-ans">✔ Correct answer: ${correctLetter}. ${q.options[q.correct]}</span><br/>
+                    <span>${statusText}</span>
+                </div>
+            `);
+        }
+
+        const scorePercent = (correctCount / currentQuestions.length * 100).toFixed(1);
+        const resultDiv = document.getElementById('resultArea');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="score">🎯 Score: ${correctCount} / ${currentQuestions.length} (${scorePercent}%)</div>
+            <div class="answer-review">
+                <h3>📖 Detailed explanations:</h3>
+                ${reviewItems.join('')}
+            </div>
+            <button id="resetQuizBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Retry</button>
+        `;
+        
+        document.getElementById('resetQuizBtn').addEventListener('click', () => {
+            document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            resultDiv.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', showResults);
+    document.getElementById('shuffleBtn').addEventListener('click', () => {
+        shuffleArray(currentQuestions);
+        renderQuestions();
+        document.getElementById('resultArea').style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    renderQuestions();
+</script>
+</body>
+</html>

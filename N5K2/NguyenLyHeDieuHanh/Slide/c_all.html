@@ -1,0 +1,550 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>📚 Ôn tập tổng hợp 6 chương Hệ điều hành (Song ngữ)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #eef2f7;
+            margin: 0;
+            padding: 20px;
+            color: #1a2c3a;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 15px 30px -10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 20px 28px 32px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+            color: #0a4b6e;
+            border-left: 6px solid #0a4b6e;
+            padding-left: 20px;
+        }
+        .sub {
+            color: #4b6f86;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 10px;
+            padding-left: 26px;
+            font-size: 0.95rem;
+        }
+        .stats {
+            background: #e9f0f5;
+            border-radius: 40px;
+            padding: 6px 16px;
+            margin-bottom: 20px;
+            display: inline-block;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        .controls {
+            text-align: right;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            background-color: #0a4b6e;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        .lang-btn:hover {
+            background-color: #06344d;
+        }
+        .question-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid #e2edf2;
+            transition: 0.1s ease;
+        }
+        .question-text {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #0b2b3b;
+            margin-bottom: 12px;
+        }
+        
+        /* --- Logic hiển thị ngôn ngữ --- */
+        body[data-lang="vi"] .lang-en { display: none !important; }
+        body[data-lang="en"] .lang-vi { display: none !important; }
+        
+        body[data-lang="bilingual"] .question-card .lang-en {
+            font-size: 0.85rem;
+            color: #5d7f96;
+            margin-top: -8px;
+            font-style: italic;
+            border-left: 3px solid #bdd4df;
+            padding-left: 12px;
+            font-weight: normal;
+        }
+        body[data-lang="bilingual"] .review-item .lang-en {
+            display: block;
+            font-size: 0.9em;
+            color: #5d7f96;
+            font-weight: normal;
+            font-style: italic;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-left: 8px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 40px;
+            background: #f9fafc;
+            transition: background 0.2s;
+            border: 1px solid #e2edf2;
+        }
+        .option:hover {
+            background: #eef3fa;
+        }
+        input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2c7da0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .option label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: normal;
+            color: #1e4a6e;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .submit-btn {
+            background: #2c7da0;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 14px 28px;
+            border-radius: 48px;
+            cursor: pointer;
+            margin: 28px 0 20px;
+            width: 100%;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .submit-btn:hover {
+            background: #1f5e7a;
+            transform: scale(0.98);
+        }
+        .result-area {
+            background: #e9f3f7;
+            border-radius: 28px;
+            padding: 18px 24px;
+            margin-top: 15px;
+            display: none;
+            border-left: 8px solid #2c7da0;
+        }
+        .score {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #155f7c;
+        }
+        .answer-review {
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            background: #ffffffd9;
+            border-radius: 20px;
+            padding: 8px 12px;
+        }
+        .review-item {
+            border-bottom: 1px solid #dce7ef;
+            padding: 12px 8px;
+        }
+        .correct-ans {
+            color: #1f8a4c;
+            font-weight: 500;
+        }
+        .user-choice {
+            color: #b45353;
+        }
+        .explanation {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: #fdfae5;
+            border-left: 5px solid #f1c40f;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 0.75rem;
+            color: #6c8d9e;
+        }
+        @media (max-width: 650px) {
+            .container {
+                padding: 16px;
+            }
+            .question-card {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body data-lang="bilingual">
+<div class="container">
+    <h1>📖 Ôn tập Hệ điều hành – 6 chương</h1>
+    <div class="sub">⚡ Tổng hợp Chương 1 → 6 | Câu hỏi song ngữ Anh - Việt | Xáo trộn ngẫu nhiên | <span id="questionCountSpan"></span> câu</div>
+    <div class="controls">
+        <button class="lang-btn" onclick="toggleLanguage()" id="langBtn">Ngôn ngữ: Song ngữ / Bilingual</button>
+        <button class="lang-btn" id="shuffleBtn" style="background-color: #2c7da0;">🔀 Xáo trộn câu hỏi</button>
+    </div>
+    <div id="questions-container"></div>
+    <button class="submit-btn" id="submitBtn">📬 NỘP BÀI & XEM ĐÁP ÁN</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>🎯 Mỗi lần tải lại trang, câu hỏi được xáo trộn hoàn toàn. Ôn tập toàn diện!</footer>
+</div>
+
+<script>
+    // ---------- NGÂN HÀNG CÂU HỎI (6 CHƯƠNG, SONG NGỮ) ----------
+    // Mỗi câu: textVi, textEn, options (mảng 4 đáp án tiếng Việt), correct (0-3)
+    // Để hiển thị song ngữ: câu hỏi tiếng Việt + dòng nhỏ tiếng Anh.
+    const rawQuestions = [
+        // CHƯƠNG 1: INTRODUCTION (20 câu)
+        { textVi: "Hệ điều hành (Operating System) là gì?", textEn: "What is an Operating System?", options: ["Phần mềm duy nhất chạy trên máy tính", "Chương trình trung gian giữa người dùng và phần cứng", "Phần cứng điều khiển CPU", "Ngôn ngữ lập trình bậc cao"], correct: 1,
+          explanationVi: "Hệ điều hành (OS) là phần mềm hệ thống hoạt động như một cầu nối (intermediary) giữa người dùng/ứng dụng và phần cứng máy tính. Nguồn gốc khái niệm này xuất phát từ việc phần cứng máy tính cấp thấp cực kỳ phức tạp (mã máy, quản lý thanh ghi). OS cung cấp một 'lớp trừu tượng' giúp phần mềm dễ dàng giao tiếp với phần cứng một cách an toàn và tối ưu.",
+          explanationEn: "An Operating System (OS) acts as an intermediary between users/applications and computer hardware. It abstracts the complex, low-level hardware details (like machine code and register management), providing a secure and optimal layer for software to interact with the physical components." },
+        { textVi: "Theo quan điểm 'máy tính mở rộng', OS có vai trò gì?", textEn: "As an 'extended machine', what is the role of the OS?", options: ["Che giấu chi tiết phức tạp của phần cứng, tạo máy ảo dễ dùng", "Tăng tốc độ xử lý của CPU", "Cung cấp trình biên dịch", "Quản lý cơ sở dữ liệu"], correct: 0,
+          explanationVi: "Quan điểm 'máy tính mở rộng' (Extended/Virtual Machine) nhìn hệ điều hành từ góc độ 'top-down'. OS che giấu những chi tiết phần cứng rắc rối (như truy cập track/sector trên đĩa cứng, quản lý timer, ngắt) và cung cấp cho lập trình viên một cỗ 'máy ảo' tinh gọn, dễ dùng với các khái niệm cấp cao như File, Thư mục, Process.",
+          explanationEn: "The 'extended machine' (or Virtual Machine) view looks at the OS from a top-down perspective. It hides messy hardware details (disk sectors, timers, interrupts) and presents a clean, easy-to-use 'virtual machine' featuring high-level concepts like Files, Directories, and Processes." },
+        { textVi: "Thế hệ máy tính đầu tiên (1945–1955) sử dụng công nghệ gì?", textEn: "Which technology was used in the first generation (1945–1955)?", options: ["Transistor", "Mạch tích hợp (IC)", "Đèn chân không (vacuum tubes)", "Vi xử lý"], correct: 2,
+          explanationVi: "Thế hệ máy tính đầu tiên sử dụng bóng đèn chân không (vacuum tubes) khổng lồ, tiêu thụ cực nhiều điện năng. Thời kỳ này <strong>chưa hề có khái niệm hệ điều hành</strong>. Các kỹ sư phải lập trình thủ công bằng mã máy thông qua việc nối dây vật lý trên các bảng cắm (plugboards).",
+          explanationEn: "The first computer generation used massive vacuum tubes that consumed huge amounts of power. In this era, <strong>operating systems did not exist</strong>. Engineers programmed in absolute machine code by physically connecting wires on plugboards." },
+        { textVi: "Hệ điều hành nào tiêu biểu cho thế hệ thứ hai (1955–1965)?", textEn: "Which OS is typical for the second generation?", options: ["Windows 95", "UNIX", "FMS (Fortran Monitor System)", "OS/360"], correct: 2,
+          explanationVi: "Thế hệ thứ hai chứng kiến sự ra đời của bóng bán dẫn (Transistor). Vì thời gian thuê máy (mainframe) rất đắt đỏ, các kỹ sư đã phát minh ra Hệ thống xử lý theo lô (Batch System) để gom các công việc (jobs) vào băng từ và chạy tự động tuần tự, tránh lãng phí thời gian CPU. FMS (Fortran Monitor System) và IBSYS là các OS xử lý lô tiêu biểu nhất thời này.",
+          explanationEn: "The second generation introduced transistors. Because mainframe computer time was extremely expensive, Batch Systems were invented to group jobs on magnetic tapes and run them automatically to avoid CPU idle time. FMS and IBSYS were typical early batch OSs." },
+        { textVi: "Đặc điểm nổi bật của thế hệ thứ ba (1965–1980) là gì?", textEn: "What is the key feature of the third generation (1965–1980)?", options: ["Xử lý theo lô (batch)", "Đa chương trình (multiprogramming) và chia sẻ thời gian (time-sharing)", "Giao diện đồ họa (GUI)", "Hệ điều hành nhúng"], correct: 1,
+          explanationVi: "Thế hệ thứ 3 sử dụng Mạch tích hợp (IC). Hai phát minh cách mạng là: 1) <strong>Đa chương trình (Multiprogramming)</strong>: Nạp nhiều job vào RAM, nếu một job đợi I/O, CPU sẽ chuyển sang chạy job khác để tối đa hóa hiệu suất; 2) <strong>Time-sharing</strong>: Phân chia thời gian CPU nhanh đến mức nhiều người dùng qua thiết bị đầu cuối (terminals) cảm giác như họ đang sở hữu toàn bộ máy tính. Hệ điều hành UNIX ra đời trong giai đoạn này.",
+          explanationEn: "The third generation used Integrated Circuits (ICs). Key innovations: 1) <strong>Multiprogramming</strong>: Keeping multiple jobs in RAM so the CPU can switch tasks if one waits for I/O. 2) <strong>Time-sharing</strong>: Sharing CPU time so rapidly that multiple terminal users feel they have dedicated access to the computer. UNIX was born in this era." },
+        { textVi: "Hệ điều hành nào thuộc loại mainframe OS?", textEn: "Which is a mainframe OS?", options: ["Windows 10", "OS/390", "Android", "VxWorks"], correct: 1 },
+        { textVi: "Real-time OS được đặc trưng bởi yếu tố nào?", textEn: "What characterizes a Real-time OS?", options: ["Hỗ trợ nhiều người dùng", "Thời gian đáp ứng là yếu tố then chốt", "Giao diện dòng lệnh", "Chạy trên thẻ thông minh"], correct: 1 },
+        { textVi: "Chế độ nào của CPU cho phép thực thi lệnh đặc quyền (privileged instructions)?", textEn: "Which CPU mode allows privileged instructions?", options: ["User mode", "Kernel mode", "Real mode", "Protected mode"], correct: 1 },
+        { textVi: "Khi thực hiện system call, CPU chuyển từ chế độ nào sang chế độ nào?", textEn: "When a system call is made, the CPU switches from:", options: ["Kernel mode → user mode", "User mode → kernel mode", "User mode → idle mode", "Kernel mode → supervisor mode"], correct: 1 },
+        { textVi: "Kỹ thuật pipeline trong CPU có tác dụng gì?", textEn: "What does pipelining in a CPU do?", options: ["Tăng dung lượng bộ nhớ", "Tăng tốc xử lý lệnh bằng cách thực hiện nhiều giai đoạn đồng thời", "Giảm tiêu thụ điện năng", "Mở rộng tập lệnh"], correct: 1 },
+        { textVi: "Hai thanh ghi dùng để bảo vệ vùng nhớ tiến trình là:", textEn: "Two registers used to protect memory regions are:", options: ["PC và SP", "Base và Limit", "Data và Address", "Control và Status"], correct: 1 },
+        { textVi: "Bộ nhớ nào sau đây là bộ nhớ chỉ đọc và chứa BIOS?", textEn: "Which memory is read-only and contains BIOS?", options: ["RAM", "Cache", "ROM", "CMOS"], correct: 2 },
+        { textVi: "DMA (Direct Memory Access) được dùng để:", textEn: "DMA is used to:", options: ["Tăng tốc CPU", "Cho phép thiết bị I/O truyền dữ liệu trực tiếp với bộ nhớ không qua CPU", "Quản lý bộ nhớ ảo", "Lưu cấu hình hệ thống"], correct: 1 },
+        { textVi: "Thành phần nào của OS tạo và hủy tiến trình, đồng bộ hóa?", textEn: "Which OS component handles process creation, termination and synchronization?", options: ["File management", "Memory management", "Process management", "I/O management"], correct: 2 },
+        { textVi: "Deadlock xảy ra khi nào?", textEn: "When does deadlock occur?", options: ["Một tiến trình dùng CPU quá lâu", "Hai hay nhiều tiến trình mỗi bên giữ tài nguyên và chờ tài nguyên của bên kia", "Bộ nhớ không đủ", "Hệ thống tắt đột ngột"], correct: 1 },
+        { textVi: "System call `fork()` trong UNIX dùng để:", textEn: "What does UNIX `fork()` do?", options: ["Tạo tiến trình con giống hệt tiến trình cha", "Kết thúc tiến trình", "Đọc dữ liệu từ file", "Đổi thư mục làm việc"], correct: 0 },
+        { textVi: "Để thay thế hoàn toàn tiến trình hiện tại bằng chương trình mới, dùng system call:", textEn: "Which system call replaces the current process with a new program?", options: ["waitpid()", "exit()", "execve()", "kill()"], correct: 2 },
+        { textVi: "Cấu trúc monolithic có đặc điểm gì?", textEn: "What is a characteristic of a monolithic OS structure?", options: ["Chia thành nhiều lớp", "Tất cả dịch vụ hệ thống nằm trong một khối, không phân module rõ ràng", "Hạt nhân cực nhỏ (microkernel)", "Ảo hóa phần cứng"], correct: 1 },
+        { textVi: "Trong mô hình client-server (microkernel), giao tiếp giữa các module ở user space qua:", textEn: "In the client-server (microkernel) model, communication between user-space modules uses:", options: ["Bộ nhớ dùng chung", "Truyền thông điệp (message passing)", "Biến toàn cục", "Ngắt phần cứng"], correct: 1 },
+        { textVi: "Tiền tố 'Giga' tương ứng với bao nhiêu byte?", textEn: "How many bytes does 'Giga' represent?", options: ["1 triệu", "1 tỷ", "1 nghìn tỷ", "1 triệu tỷ"], correct: 1 },
+        // CHƯƠNG 2: PROCESSES & THREADS (25 câu)
+        { textVi: "Process là gì?", textEn: "What is a process?", options: ["Một chương trình đang thực thi", "Một file trên đĩa", "Một thư mục", "Một thiết bị I/O"], correct: 0 },
+        { textVi: "Trạng thái nào thể hiện process đang chờ một sự kiện (ví dụ I/O)?", textEn: "Which state indicates a process is waiting for an event (e.g., I/O)?", options: ["Ready", "Running", "Waiting", "Terminated"], correct: 2 },
+        { textVi: "Thành phần nào KHÔNG nằm trong PCB?", textEn: "Which is NOT part of the PCB?", options: ["Program Counter", "Nội dung file thực thi (mã lệnh)", "CPU Registers", "Process state"], correct: 1 },
+        { textVi: "System call tạo tiến trình mới trong Unix là:", textEn: "System call to create a new process in Unix:", options: ["exec()", "fork()", "wait()", "exit()"], correct: 1 },
+        { textVi: "Điều nào đúng về phân cấp tiến trình trong Unix?", textEn: "Which is true about process hierarchy in Unix?", options: ["Không có khái niệm cha-con", "Mọi tiến trình đều bình đẳng", "Parent tạo child, tạo thành cây", "Chỉ có một tiến trình duy nhất"], correct: 2 },
+        { textVi: "Lợi ích nào KHÔNG phải của thread so với process?", textEn: "Which is NOT a benefit of threads over processes?", options: ["Responsiveness", "Resource sharing", "Bảo vệ bộ nhớ tốt hơn", "Economy"], correct: 2 },
+        { textVi: "Trong user-level threads, kernel có biết về các thread không?", textEn: "In user-level threads, does the kernel know about threads?", options: ["Có, kernel quản lý từng thread", "Không, kernel chỉ thấy một process", "Chỉ biết nếu thread tạo bằng clone()", "Tùy thuộc"], correct: 1 },
+        { textVi: "Giải thuật Round Robin thuộc loại điều phối nào?", textEn: "Round Robin is which type of scheduling?", options: ["Non-preemptive", "Preemptive", "FCFS", "Priority"], correct: 1 },
+        { textVi: "Hiện tượng 'convoy effect' xảy ra trong giải thuật nào?", textEn: "Which algorithm suffers from 'convoy effect'?", options: ["Round Robin", "SJF", "FCFS", "Priority"], correct: 2 },
+        { textVi: "Giải thuật tối ưu turnaround time nếu biết trước thời gian thực thi:", textEn: "Which algorithm minimizes turnaround time if burst times are known?", options: ["FCFS", "Round Robin", "SJF", "Priority"], correct: 2 },
+        { textVi: "Starvation trong priority scheduling có thể giải quyết bằng:", textEn: "Starvation in priority scheduling can be solved by:", options: ["Tăng time quantum", "Aging", "Dùng FCFS", "Tắt preemption"], correct: 1 },
+        { textVi: "Race condition là gì?", textEn: "What is a race condition?", options: ["Khi hai process cùng chạy song song an toàn", "Kết quả phụ thuộc vào thứ tự thực thi không kiểm soát được", "CPU không đủ nhanh", "Bộ nhớ bị tràn"], correct: 1 },
+        { textVi: "Peterson's solution dùng để:", textEn: "Peterson's solution is used for:", options: ["Tránh deadlock", "Mutual exclusion cho 2 process", "Điều phối CPU", "Quản lý bộ nhớ"], correct: 1 },
+        { textVi: "Semaphore, thao tác Down(S) (P) được định nghĩa:", textEn: "Semaphore Down(S) (P) operation:", options: ["S.value++; if <=0 sleep", "S.value--; if <0 sleep", "S.value = 0; sleep", "S.value = 1; wakeup"], correct: 1 },
+        { textVi: "Monitor là cấu trúc đồng bộ hóa, đặc điểm nào đúng?", textEn: "Which is true about monitors?", options: ["Do kernel quản lý hoàn toàn", "Tự động mutual exclusion, dùng condition variable", "Không giải quyết được Producer-Consumer", "Chỉ đơn CPU"], correct: 1 },
+        { textVi: "Context switch là hành động:", textEn: "Context switch is:", options: ["Lưu trạng thái tiến trình cũ và nạp trạng thái mới", "Tắt CPU", "Gọi hàm hệ thống", "Khởi tạo bảng phân trang"], correct: 0 },
+        { textVi: "Một process có 3 threads. Điều nào được chia sẻ giữa các thread?", textEn: "Which is shared among threads of the same process?", options: ["Program counter", "Stack", "Global variables", "Thanh ghi riêng"], correct: 2 },
+        { textVi: "Sleep & wakeup cần sự hỗ trợ từ:", textEn: "Sleep & wakeup require support from:", options: ["Phần cứng", "Hệ điều hành", "Trình biên dịch", "CPU"], correct: 1 },
+        { textVi: "Multilevel queue thường dùng để:", textEn: "Multilevel queue scheduling is used to:", options: ["Phân loại tiến trình theo độ ưu tiên", "Chỉ một hàng đợi duy nhất", "Loại bỏ preemption", "Chạy mọi process cùng time quantum"], correct: 0 },
+        { textVi: "Kernel-level threads có đặc điểm:", textEn: "Kernel-level threads feature:", options: ["Kernel không biết", "Chi phí chuyển ngữ cảnh thấp hơn user-level", "Mỗi thread là đơn vị điều phối độc lập do kernel quản lý", "Thread bị block sẽ block cả process"], correct: 2 },
+        { textVi: "Thuật toán điều phối nào ưu tiên process có thời gian CPU ngắn nhất?", textEn: "Which scheduling algorithm gives priority to the process with the shortest CPU burst?", options: ["FCFS", "Round Robin", "SJF", "Priority"], correct: 2 },
+        { textVi: "Điều kiện deadlock: 'Hold and wait' nghĩa là:", textEn: "Hold and wait condition means:", options: ["Process đang giữ tài nguyên và yêu cầu thêm", "Tài nguyên không thể tước", "Chỉ một process dùng tài nguyên", "Vòng tròn chờ"], correct: 0 },
+        { textVi: "Giải pháp phần cứng cho mutual exclusion thường dùng:", textEn: "A hardware solution for mutual exclusion is:", options: ["Peterson", "TSL (Test and Set Lock)", "Semaphore", "Monitor"], correct: 1 },
+        { textVi: "Bounded Buffer (Producer-Consumer) cần semaphore để:", textEn: "Bounded Buffer problem uses semaphores for:", options: ["Đồng bộ truy cập buffer và đếm số phần tử", "Thay thế bộ nhớ", "Tăng tốc sản xuất", "Ngăn chặn mọi tương tranh"], correct: 0 },
+        { textVi: "Trong mô hình hybrid threads, user threads ánh xạ tới:", textEn: "In hybrid threading model, user threads map to:", options: ["Kernel threads", "Processes", "CPUs", "TLB"], correct: 0 },
+        // CHƯƠNG 3: MEMORY MANAGEMENT (25 câu)
+        { textVi: "Địa chỉ logic (logical address) là gì?", textEn: "What is a logical address?", options: ["Địa chỉ thực tế trong RAM", "Địa chỉ do CPU tạo ra, còn gọi là virtual address", "Địa chỉ trên đĩa cứng", "Địa chỉ thanh ghi"], correct: 1 },
+        { textVi: "Base và Limit register dùng để:", textEn: "Base and Limit registers are used for:", options: ["Tăng tốc CPU", "Bảo vệ vùng nhớ của process", "Quản lý bộ nhớ cache", "Điều phối I/O"], correct: 1 },
+        { textVi: "External fragmentation xảy ra khi:", textEn: "External fragmentation occurs when:", options: ["Tổng bộ nhớ đủ nhưng không liên tục", "Cấp phát nhiều hơn yêu cầu", "Trang bị lỗi", "Bộ nhớ cache đầy"], correct: 0 },
+        { textVi: "Internal fragmentation xảy ra khi:", textEn: "Internal fragmentation occurs when:", options: ["Bộ nhớ bị chia cắt thành nhiều mảnh nhỏ", "Vùng nhớ cấp phát lớn hơn yêu cầu, phần thừa nằm trong phân vùng", "Không đủ bộ nhớ", "Lỗi phân đoạn"], correct: 1 },
+        { textVi: "Trong paging, page frame là:", textEn: "In paging, a page frame is:", options: ["Khối bộ nhớ logic kích thước cố định", "Khối bộ nhớ vật lý cùng kích thước trang", "Một mục trong bảng trang", "Thanh ghi"], correct: 1 },
+        { textVi: "Page table chứa:", textEn: "Page table contains:", options: ["Ánh xạ từ địa chỉ vật lý sang logic", "Ánh xạ từ page number → frame number", "Lịch sử truy cập", "Kích thước bộ nhớ ảo"], correct: 1 },
+        { textVi: "TLB có tác dụng chính:", textEn: "Main purpose of TLB:", options: ["Tăng dung lượng RAM", "Giảm số lần truy cập bộ nhớ khi tra page table", "Thay thế page table", "Lưu toàn bộ page table"], correct: 1 },
+        { textVi: "Page fault xảy ra khi:", textEn: "Page fault occurs when:", options: ["Truy cập trang chưa cấp phát", "Truy cập trang không có trong RAM", "Bộ nhớ tràn", "Lỗi bảo vệ"], correct: 1 },
+        { textVi: "Thuật toán page replacement nào dùng làm chuẩn (benchmark) nhưng không cài đặt thực tế?", textEn: "Which page replacement algorithm is used as a benchmark but not implementable?", options: ["FIFO", "LRU", "Optimal", "Clock"], correct: 2 },
+        { textVi: "Segmentation khác paging ở điểm:", textEn: "Segmentation differs from paging in that:", options: ["Không cần MMU", "Chia chương trình thành các đoạn có ý nghĩa logic, kích thước thay đổi", "Chỉ dùng nhúng", "Không hỗ trợ bộ nhớ ảo"], correct: 1 },
+        { textVi: "Compaction (nén bộ nhớ) dùng để giải quyết vấn đề:", textEn: "Compaction solves which problem?", options: ["Internal fragmentation", "External fragmentation", "Page fault", "Thrashing"], correct: 1 },
+        { textVi: "Trong Pentium, linear address 32-bit chia thành:", textEn: "In Pentium, 32-bit linear address is divided into:", options: ["10 bit directory, 10 bit table, 12 bit offset", "12 bit directory, 10 bit table, 10 bit offset", "8,8,16", "10,12,10"], correct: 0 },
+        { textVi: "Bit 'dirty' (modified) trong PTE dùng để:", textEn: "The dirty bit in a page table entry is used to:", options: ["Xác định trang có được phép đọc", "Xác định trang đã bị ghi (thay đổi) chưa", "Xác định trang trong cache", "Xác định trang chia sẻ"], correct: 1 },
+        { textVi: "MMU có chức năng:", textEn: "MMU's function is:", options: ["Chuyển đổi địa chỉ logic → vật lý", "Quản lý ngắt", "Điều phối CPU", "Quản lý file"], correct: 0 },
+        { textVi: "Swapping là kỹ thuật:", textEn: "Swapping is a technique of:", options: ["Hoán đổi toàn bộ process giữa RAM và đĩa", "Chỉ hoán đổi trang", "Chia bộ nhớ thành phân vùng cố định", "Tăng bộ nhớ ảo"], correct: 0 },
+        { textVi: "Kích thước trang nhỏ dẫn đến:", textEn: "Small page size leads to:", options: ["Ít phân mảnh nội hơn nhưng bảng trang lớn hơn", "Phân mảnh ngoại tăng", "Số page fault giảm", "Hiệu suất luôn tốt"], correct: 0 },
+        { textVi: "LRU thay thế trang:", textEn: "LRU replaces the page that is:", options: ["Vào sớm nhất", "Ít được dùng nhất trong thời gian gần", "Chưa được dùng trong thời gian dài", "Được dùng nhiều nhất"], correct: 1 },
+        { textVi: "Demand paging có nghĩa là:", textEn: "Demand paging means:", options: ["Nạp toàn bộ process trước khi chạy", "Chỉ nạp trang khi process yêu cầu (page fault)", "Luôn giữ tất cả trang trong RAM", "Chỉ dùng cho batch"], correct: 1 },
+        { textVi: "Khi xảy ra page fault, thứ tự xử lý đúng là:", textEn: "Correct order when a page fault occurs:", options: ["Trap → tìm khung trống → đọc trang từ đĩa → cập nhật page table → restart", "Đọc trang → trap → cập nhật → restart", "Cập nhật → trap → đọc trang", "Restart → trap → tìm khung"], correct: 0 },
+        { textVi: "Thrashing là hiện tượng:", textEn: "Thrashing is a phenomenon where:", options: ["CPU sử dụng nhiều thời gian để page in/out hơn là tính toán", "Bộ nhớ đủ", "Deadlock xảy ra", "Tiến trình bị starvation"], correct: 0 },
+        { textVi: "Shared pages giữa các process thường dùng cho:", textEn: "Shared pages between processes are often used for:", options: ["Dữ liệu riêng", "Thư viện dùng chung (code)", "Stack", "Heap"], correct: 1 },
+        { textVi: "Paging daemon có nhiệm vụ:", textEn: "Paging daemon's job is:", options: ["Cấp phát bộ nhớ mới", "Định kỳ đẩy trang dirty ra đĩa", "Phát hiện deadlock", "Quản lý TLB"], correct: 1 },
+        { textVi: "Two-level paging giúp:", textEn: "Two-level paging helps to:", options: ["Giảm kích thước page table trong bộ nhớ", "Tăng tốc truy cập", "Tránh phân mảnh", "Hỗ trợ nhiều process hơn"], correct: 0 },
+        { textVi: "Trong segmentation, mỗi địa chỉ logic gồm:", textEn: "In segmentation, a logical address consists of:", options: ["Số frame và offset", "Số segment và offset", "Số page và offset", "Số khung và offset"], correct: 1 },
+        { textVi: "Kỹ thuật 'copy-on-write' dùng để:", textEn: "Copy-on-write is used to:", options: ["Sao chép toàn bộ bộ nhớ ngay lập tức", "Trì hoãn việc sao chép trang cho đến khi có ghi", "Tăng tốc I/O", "Giảm dung lượng đĩa"], correct: 1 },
+        // CHƯƠNG 4: FILE SYSTEMS (25 câu)
+        { textVi: "Mục đích chính của file system là:", textEn: "Main purpose of a file system:", options: ["Quản lý bộ nhớ chính", "Lưu trữ thông tin lâu dài, nhiều process truy cập đồng thời", "Điều phối CPU", "Quản lý tiến trình"], correct: 1 },
+        { textVi: "Loại cấu trúc file phổ biến trong Unix/Windows:", textEn: "Common file structure in Unix/Windows:", options: ["Record sequence", "Byte sequence", "Tree", "Block sequence"], correct: 1 },
+        { textVi: "Thao tác nào KHÔNG phải là thao tác file cơ bản?", textEn: "Which is NOT a basic file operation?", options: ["Open", "Seek", "Fork", "Close"], correct: 2 },
+        { textVi: "Archive flag dùng để:", textEn: "Archive flag is used to:", options: ["Đánh dấu file chỉ đọc", "Đánh dấu file cần backup", "Đánh dấu file hệ thống", "Đánh dấu file tạm thời"], correct: 1 },
+        { textVi: "Sequential access phù hợp nhất với thiết bị nào?", textEn: "Sequential access is most suitable for:", options: ["Đĩa cứng", "Băng từ", "RAM", "Cache"], correct: 1 },
+        { textVi: "Memory-mapped file cho phép:", textEn: "Memory-mapped file allows:", options: ["Ánh xạ file vào không gian địa chỉ process", "Nén file", "Mã hóa file", "Sao lưu"], correct: 0 },
+        { textVi: "Cấu trúc thư mục hai cấp giải quyết vấn đề gì?", textEn: "Two-level directory solves which problem?", options: ["Phân mảnh đĩa", "Trùng tên file giữa các người dùng", "Tốc độ chậm", "Giới hạn kích thước"], correct: 1 },
+        { textVi: "Contiguous allocation nhược điểm chính:", textEn: "Main disadvantage of contiguous allocation:", options: ["Không hỗ trợ truy cập ngẫu nhiên", "Gây phân mảnh ngoại và khó mở rộng file", "Tốn bộ nhớ chỉ mục", "Truy cập chậm"], correct: 1 },
+        { textVi: "Linked allocation được dùng trong file system nào?", textEn: "Linked allocation is used in which file system?", options: ["NTFS", "FAT (MS-DOS)", "ext4", "HFS+"], correct: 1 },
+        { textVi: "Indexed allocation, index block chứa:", textEn: "In indexed allocation, the index block contains:", options: ["Nội dung file", "Danh sách con trỏ đến các khối dữ liệu", "Tên file", "Bảng FAT"], correct: 1 },
+        { textVi: "Inode trong UNIX chứa:", textEn: "Inode in UNIX contains:", options: ["Tên file", "Metadata của file (quyền, kích thước, địa chỉ khối)", "Nội dung file", "Thư mục chứa file"], correct: 1 },
+        { textVi: "Hard link là:", textEn: "Hard link is:", options: ["Symbolic link", "Mục nhập thư mục trực tiếp trỏ đến cùng inode", "Bản sao file", "File đặc biệt chứa đường dẫn"], correct: 1 },
+        { textVi: "Symbolic link có thể trỏ đến file trên khác phân vùng không?", textEn: "Can a symbolic link point to a file on a different partition?", options: ["Có", "Không", "Chỉ nếu cùng hệ thống file", "Tùy thuộc"], correct: 0 },
+        { textVi: "Bit map quản lý vùng trống có ưu điểm:", textEn: "Advantage of bit map for free space management:", options: ["Tiết kiệm không gian", "Hiệu quả tìm vùng liên tục", "Đơn giản", "Không cần bộ nhớ"], correct: 1 },
+        { textVi: "FAT được lưu ở đâu để tăng tốc?", textEn: "Where is FAT stored to speed up access?", options: ["Trên đĩa và đọc vào RAM", "Chỉ trên đĩa", "Trong cache CPU", "Trong ROM"], correct: 0 },
+        { textVi: "Trong MS-DOS FAT, directory entry cơ bản chiếm bao nhiêu byte?", textEn: "Basic directory entry in MS-DOS FAT occupies how many bytes?", options: ["16", "32", "64", "128"], correct: 1 },
+        { textVi: "Windows 98 hỗ trợ tên file dài bằng cách:", textEn: "Windows 98 supports long file names by:", options: ["Mở rộng kích thước entry", "Dùng nhiều directory entry liên tiếp để lưu Unicode", "Lưu tên trong file riêng", "Không hỗ trợ"], correct: 1 },
+        { textVi: "Trong UNIX V7, directory entry chứa:", textEn: "In UNIX V7, directory entry contains:", options: ["inode number và tên file", "toàn bộ thuộc tính", "địa chỉ khối đầu tiên", "kích thước"], correct: 0 },
+        { textVi: "Kích thước khối lớn mang lại lợi ích gì?", textEn: "Large block size provides:", options: ["Ít phân mảnh nội bộ hơn", "Hiệu suất truyền dữ liệu cao hơn", "Quản lý dễ hơn", "Tiết kiệm không gian"], correct: 1 },
+        { textVi: "Phương pháp cấp phát thường dùng cho CD-ROM (biết trước kích thước) là:", textEn: "Which allocation method is common for CD-ROM (known size, no deletion)?", options: ["Contiguous", "Linked", "Indexed", "FAT"], correct: 0 },
+        { textVi: "Superblock trong UNIX chứa:", textEn: "Superblock in UNIX contains:", options: ["Nội dung file", "Thông tin toàn bộ hệ thống tập tin (kích thước, số inode, danh sách khối trống)", "Bảng phân đoạn", "Bảng trang"], correct: 1 },
+        { textVi: "Thao tác 'link' trong UNIX tạo ra:", textEn: "The 'link' operation in UNIX creates a:", options: ["Hard link", "Symbolic link", "Bản sao", "File nén"], correct: 0 },
+        { textVi: "Khi xóa file gốc mà vẫn còn hard link:", textEn: "If the original file is deleted while hard links exist:", options: ["Dữ liệu vẫn tồn tại, hard link vẫn truy cập được", "Dữ liệu bị xóa ngay", "Hard link trở thành symbolic link", "Báo lỗi"], correct: 0 },
+        { textVi: "FAT-12 có kích thước phân vùng tối đa với block 4KB khoảng:", textEn: "FAT-12 maximum partition size with 4KB blocks is about:", options: ["2MB", "16MB", "128MB", "2GB"], correct: 1 },
+        { textVi: "Inode direct blocks trỏ trực tiếp đến:", textEn: "Inode direct blocks point directly to:", options: ["Data blocks", "Indirect blocks", "Directory entries", "Superblock"], correct: 0 },
+        // CHƯƠNG 5: INPUT/OUTPUT (20 câu)
+        { textVi: "Thiết bị nào sau đây là block device?", textEn: "Which is a block device?", options: ["Bàn phím", "Chuột", "Đĩa cứng", "Cổng serial"], correct: 2 },
+        { textVi: "Character device truyền dữ liệu:", textEn: "Character device transfers data:", options: ["Theo khối", "Theo từng ký tự", "Theo track", "Theo bản ghi"], correct: 1 },
+        { textVi: "Device controller có chức năng:", textEn: "Device controller's function:", options: ["Chuyển đổi nối tiếp → khối byte, sửa lỗi", "Quản lý bộ nhớ", "Điều phối CPU", "Lập lịch đĩa"], correct: 0 },
+        { textVi: "Memory-mapped I/O cho phép:", textEn: "Memory-mapped I/O allows:", options: ["Dùng lệnh IN/OUT", "Ánh xạ thanh ghi thiết bị vào không gian địa chỉ bộ nhớ", "Chỉ dùng ngắt", "Tăng tốc DMA"], correct: 1 },
+        { textVi: "Programmed I/O (polling) nhược điểm chính:", textEn: "Main drawback of programmed I/O (polling):", options: ["Phức tạp", "Lãng phí CPU (busy-wait)", "Cần phần cứng đặc biệt", "Chậm hơn DMA"], correct: 1 },
+        { textVi: "Interrupt-driven I/O, thiết bị báo CPU bằng:", textEn: "In interrupt-driven I/O, device notifies CPU via:", options: ["Cờ", "Ngắt (interrupt)", "DMA", "Polling"], correct: 1 },
+        { textVi: "DMA giảm tải cho CPU bằng cách:", textEn: "DMA reduces CPU load by:", options: ["Chuyển dữ liệu trực tiếp giữa thiết bị và bộ nhớ không qua CPU cho từng byte", "Tăng tốc CPU", "Dùng ngắt thường xuyên", "Bỏ qua bộ nhớ"], correct: 0 },
+        { textVi: "Trong DMA, ai khởi tạo truyền và nhận ngắt khi xong?", textEn: "In DMA, who initiates transfer and receives interrupt when done?", options: ["CPU", "DMA controller", "Device driver", "Interrupt handler"], correct: 0 },
+        { textVi: "Device independence nghĩa là:", textEn: "Device independence means:", options: ["Mỗi thiết bị có driver riêng", "Chương trình có thể truy cập mọi thiết bị mà không cần biết trước", "Tất cả thiết bị cùng tốc độ", "Chỉ dùng một loại thiết bị"], correct: 1 },
+        { textVi: "Thời gian truy cập đĩa gồm 3 thành phần, thành phần nào lớn nhất?", textEn: "Which component of disk access time is usually largest?", options: ["Seek time", "Rotational latency", "Transfer time", "Cả ba bằng"], correct: 0 },
+        { textVi: "Thuật toán elevator (SCAN) di chuyển đầu đọc:", textEn: "Elevator (SCAN) algorithm moves the disk arm:", options: ["Theo thứ tự yêu cầu", "Qua lại như thang máy", "Luôn về đầu", "Theo khoảng cách ngắn nhất"], correct: 1 },
+        { textVi: "RAID 1 (mirroring) cung cấp:", textEn: "RAID 1 (mirroring) provides:", options: ["Striping không dự phòng", "Nhân đôi dữ liệu trên hai đĩa trở lên", "Parity chuyên dụng", "Parity phân tán"], correct: 1 },
+        { textVi: "Cylinder skew dùng để:", textEn: "Cylinder skew is used to:", options: ["Tăng dung lượng", "Giảm thời gian chờ khi chuyển track", "Sửa lỗi bad sector", "Mã hóa"], correct: 1 },
+        { textVi: "Interleaving (đan xen) trên đĩa tránh:", textEn: "Interleaving on disks avoids:", options: ["Mất vòng quay khi CPU chưa kịp xử lý dữ liệu", "Lỗi đọc", "Phân mảnh", "Overheating"], correct: 0 },
+        { textVi: "Bad sector xử lý bằng phương pháp 'sector slipping':", textEn: "Bad sector handling using 'sector slipping':", options: ["Bỏ qua và dùng sector dự phòng, dịch các sector sau", "Định dạng lại toàn bộ", "Tăng kích thước sector", "Giảm tốc độ"], correct: 0 },
+        { textVi: "Trong programmed I/O in chuỗi ký tự, CPU:", textEn: "In programmed I/O printing a string, CPU:", options: ["Ghi từng ký tự và chờ (busy-wait)", "Chỉ khởi tạo DMA", "Ngủ cho đến ngắt", "Sao chép buffer"], correct: 0 },
+        { textVi: "Đối với màn hình, memory-mapped display nghĩa là:", textEn: "Memory-mapped display means:", options: ["Dùng RAM riêng", "Ánh xạ video RAM vào không gian địa chỉ CPU, driver ghi trực tiếp", "Dùng lệnh IN/OUT", "Chỉ chế độ văn bản"], correct: 1 },
+        { textVi: "BitBlt dùng để:", textEn: "BitBlt is used to:", options: ["Vẽ hình chữ nhật", "Sao chép vùng bitmap", "Thay đổi font", "Quản lý bàn phím"], correct: 1 },
+        { textVi: "SSF (Shortest Seek First) có thể gây:", textEn: "SSF (Shortest Seek First) may cause:", options: ["Deadlock", "Starvation", "Low throughput", "High latency"], correct: 1 },
+        { textVi: "RAID 0 (striping) đặc điểm:", textEn: "RAID 0 (striping) features:", options: ["Dự phòng dữ liệu", "Tăng hiệu suất nhưng không dự phòng", "Nhân đôi dữ liệu", "Parity phân tán"], correct: 1 },
+        // CHƯƠNG 6: DEADLOCKS (25 câu)
+        { textVi: "Deadlock định nghĩa chính xác nhất:", textEn: "Most precise definition of deadlock:", options: ["Process chờ CPU", "Mỗi process trong tập chờ sự kiện chỉ do process khác trong tập gây ra", "Thiếu bộ nhớ", "Lỗi phần cứng"], correct: 1 },
+        { textVi: "Bốn điều kiện cần cho deadlock là:", textEn: "Four necessary conditions for deadlock are:", options: ["Mutual exclusion, hold&wait, no preemption, circular wait", "Preemption, waiting, circular, mutual", "Spooling, aging, ordering, killing", "FCFS, SJF, RR, Priority"], correct: 0 },
+        { textVi: "Circular wait là điều kiện:", textEn: "Circular wait condition means:", options: ["Tồn tại vòng tròn chờ tài nguyên", "Process chờ tài nguyên vô hạn", "Tất cả process đều chờ", "Không có tiến trình nào chạy"], correct: 0 },
+        { textVi: "Ostrich algorithm xử lý deadlock bằng cách:", textEn: "Ostrich algorithm handles deadlock by:", options: ["Phát hiện và phục hồi", "Giả vờ không có vấn đề", "Tránh deadlock", "Ngăn ngừa"], correct: 1 },
+        { textVi: "Phát hiện deadlock với một instance mỗi loại dùng:", textEn: "Detection with single instance per resource type uses:", options: ["Resource Allocation Graph (RAG)", "Banker's algorithm", "Ma trận", "Semaphore"], correct: 0 },
+        { textVi: "Trong deadlock detection với nhiều instance, vector A là:", textEn: "In detection with multiple instances, vector A is:", options: ["Existing", "Available", "Allocation", "Request"], correct: 1 },
+        { textVi: "Phục hồi deadlock bằng rollback cần:", textEn: "Rollback recovery requires:", options: ["Checkpoint định kỳ", "Preemption", "Killing process", "Khởi động lại"], correct: 0 },
+        { textVi: "Banker's algorithm đảm bảo hệ thống luôn ở:", textEn: "Banker's algorithm ensures the system stays in:", options: ["Deadlock state", "Safe state", "Unsafe state", "Idle state"], correct: 1 },
+        { textVi: "Safe state khác unsafe state ở điểm:", textEn: "Safe state differs from unsafe state in that:", options: ["Safe state không deadlock, unsafe state có thể deadlock", "Unsafe state không deadlock", "Safe state luôn có deadlock", "Không khác"], correct: 0 },
+        { textVi: "Để ngăn ngừa deadlock, tấn công điều kiện 'hold and wait' bằng cách:", textEn: "To prevent deadlock by attacking 'hold and wait', we can:", options: ["Spooling", "Request all resources initially", "Preemption", "Order resources"], correct: 1 },
+        { textVi: "Spooling nhằm loại bỏ điều kiện nào?", textEn: "Spooling aims to eliminate which condition?", options: ["Mutual exclusion", "Hold and wait", "No preemption", "Circular wait"], correct: 0 },
+        { textVi: "Preemption (tước tài nguyên) khó áp dụng với:", textEn: "Preemption is difficult for:", options: ["CPU", "Máy in đang in", "Bộ nhớ", "Cache"], correct: 1 },
+        { textVi: "Two-phase locking thường dùng trong:", textEn: "Two-phase locking is commonly used in:", options: ["Hệ thống file", "Cơ sở dữ liệu", "Lập lịch CPU", "Mạng"], correct: 1 },
+        { textVi: "Trong two-phase locking, nếu không khóa được tất cả, process sẽ:", textEn: "In two-phase locking, if cannot lock all needed items, process will:", options: ["Chờ", "Giải phóng khóa và bắt đầu lại", "Tiếp tục", "Deadlock"], correct: 1 },
+        { textVi: "Non-resource deadlock có thể xảy ra với:", textEn: "Non-resource deadlock can occur with:", options: ["Semaphore", "File", "Disk", "Printer"], correct: 0 },
+        { textVi: "Starvation (đói) là gì?", textEn: "What is starvation?", options: ["Process bị hoãn vô hạn dù không deadlock", "Deadlock", "Thiếu tài nguyên", "Lỗi phần cứng"], correct: 0 },
+        { textVi: "Giải pháp đơn giản cho starvation là:", textEn: "Simple solution for starvation is:", options: ["FCFS scheduling", "Priority scheduling", "Round Robin", "SJF"], correct: 0 },
+        { textVi: "Trong RAG, một chu trình với tài nguyên nhiều instance:", textEn: "In RAG, a cycle with multi-instance resources:", options: ["Chắc chắn deadlock", "Chưa chắc deadlock", "Không thể có chu trình", "Luôn an toàn"], correct: 1 },
+        { textVi: "Banker's algorithm yêu cầu biết trước:", textEn: "Banker's algorithm requires knowing in advance:", options: ["Tốc độ CPU", "Nhu cầu tối đa của mỗi process", "Thời gian thực thi", "Số lượng người dùng"], correct: 1 },
+        { textVi: "Khi phát hiện deadlock, phương pháp 'killing process' có ưu điểm:", textEn: "Advantage of 'killing process' for deadlock recovery:", options: ["Đơn giản, dễ cài đặt", "Không mất dữ liệu", "Nhanh nhất", "Tối ưu"], correct: 0 },
+        { textVi: "Deadlock avoidance khác prevention ở chỗ:", textEn: "Deadlock avoidance differs from prevention in that:", options: ["Avoidance cần biết trước yêu cầu tối đa", "Prevention hiệu quả hơn", "Avoidance không cần điều kiện", "Prevention không khả thi"], correct: 0 },
+        { textVi: "Trong deadlock detection, thuật toán kết thúc khi:", textEn: "In deadlock detection, the algorithm terminates when:", options: ["Tất cả process được đánh dấu hoặc không còn process nào thỏa mãn", "Có deadlock", "Hết thời gian", "Tài nguyên đầy"], correct: 0 },
+        { textVi: "Điều kiện 'no preemption' có nghĩa:", textEn: "No preemption condition means:", options: ["Tài nguyên có thể bị tước", "Tài nguyên không thể bị tước", "Process ưu tiên cao hơn được tước", "Chỉ kernel mới tước được"], correct: 1 },
+        { textVi: "Trong Banker's algorithm, nếu yêu cầu dẫn đến unsafe state:", textEn: "In Banker's algorithm, if a request leads to unsafe state:", options: ["Được cấp", "Bị từ chối (hoãn)", "Chấp nhận rủi ro", "Tự động kill process"], correct: 1 },
+        { textVi: "Deadlock khác livelock ở điểm:", textEn: "Deadlock differs from livelock in that:", options: ["Deadlock: các process không thay đổi trạng thái; livelock: thay đổi nhưng không tiến triển", "Livelock nguy hiểm hơn", "Deadlock chỉ xảy ra với tài nguyên", "Livelock chỉ xảy ra với CPU"], correct: 0 }
+    ];
+
+    // Tổng số câu
+    const allQuestions = [...rawQuestions];
+    // Xáo trộn ngẫu nhiên
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+    const shuffledQuestions = shuffleArray([...allQuestions]);
+
+    // Render
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        shuffledQuestions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `q-${idx}`;
+            const qNumber = idx + 1;
+            const qTextDiv = document.createElement('div');
+            qTextDiv.className = 'question-text lang-vi';
+            qTextDiv.innerHTML = `${qNumber}. ${q.textVi}`;
+            const qEnDiv = document.createElement('div');
+            qEnDiv.className = 'question-text lang-en';
+            qEnDiv.innerHTML = `🇬🇧 ${qNumber}. ${q.textEn}`;
+            card.appendChild(qTextDiv);
+            card.appendChild(qEnDiv);
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+            q.options.forEach((opt, optIdx) => {
+                const optId = `q${idx}_opt${optIdx}`;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${idx}`;
+                radio.value = optIdx;
+                radio.id = optId;
+                const label = document.createElement('label');
+                label.htmlFor = optId;
+                label.textContent = `${String.fromCharCode(65+optIdx)}. ${opt}`;
+                optionDiv.appendChild(radio);
+                optionDiv.appendChild(label);
+                optionsDiv.appendChild(optionDiv);
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+        document.getElementById('questionCountSpan').innerText = shuffledQuestions.length;
+    }
+
+    function getUserAnswers() {
+        const answers = [];
+        for (let i = 0; i < shuffledQuestions.length; i++) {
+            const radios = document.querySelectorAll(`input[name="question${i}"]`);
+            let selected = null;
+            for (let r of radios) {
+                if (r.checked) {
+                    selected = parseInt(r.value);
+                    break;
+                }
+            }
+            answers.push(selected);
+        }
+        return answers;
+    }
+
+    function showResults() {
+        const userAnswers = getUserAnswers();
+        let correctCount = 0;
+        const reviewItems = [];
+        for (let i = 0; i < shuffledQuestions.length; i++) {
+            const q = shuffledQuestions[i];
+            const userChoice = userAnswers[i];
+            const isCorrect = (userChoice !== null && userChoice === q.correct);
+            if (isCorrect) correctCount++;
+            let userLetter = userChoice !== null ? String.fromCharCode(65+userChoice) : "❌ Chưa chọn";
+            let correctLetter = String.fromCharCode(65+q.correct);
+            let correctText = q.options[q.correct];
+            let statusText = isCorrect ? "✅ Đúng" : "❌ Sai";
+
+            let expVi = q.explanationVi ? `<div class="lang-vi" style="margin-top: 8px;">💡 <strong>Kiến thức & Giải thích:</strong> ${q.explanationVi}</div>` : '';
+            let expEn = q.explanationEn ? `<div class="lang-en" style="margin-top: 8px;">💡 <strong>Knowledge & Explanation:</strong> ${q.explanationEn}</div>` : '';
+
+            reviewItems.push(`
+                <div class="review-item">
+                    <div style="margin-bottom: 6px;">
+                        <strong class="lang-vi">Câu ${i+1}: ${q.textVi}</strong>
+                        <strong class="lang-en">Question ${i+1}: ${q.textEn}</strong>
+                    </div>
+                    <span class="user-choice">📌 Bạn chọn: ${userLetter} ${userChoice !== null ? q.options[userChoice] : '(chưa chọn)'}</span><br/>
+                    <span class="correct-ans">✔ Đáp án đúng: ${correctLetter}. ${correctText}</span><br/>
+                    <span>${statusText}</span>
+                    ${(expVi || expEn) ? `<div class="explanation">${expVi}${expEn}</div>` : ''}
+                </div>
+            `);
+        }
+        const scorePercent = (correctCount / shuffledQuestions.length * 100).toFixed(1);
+        const resultDiv = document.getElementById('resultArea');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="score">🎯 Điểm số: ${correctCount} / ${shuffledQuestions.length} (${scorePercent}%)</div>
+            <div class="answer-review">
+                <h3>📖 Chi tiết đáp án:</h3>
+                ${reviewItems.join('')}
+            </div>
+            <button id="resetQuizBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Làm lại (giữ nguyên câu hỏi)</button>
+        `;
+        const resetBtn = document.getElementById('resetQuizBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const allRadios = document.querySelectorAll('input[type="radio"]');
+                allRadios.forEach(radio => radio.checked = false);
+                resultDiv.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    }
+
+    function toggleLanguage() {
+        const body = document.body;
+        const btn = document.getElementById('langBtn');
+        const currentLang = body.getAttribute('data-lang');
+
+        if (currentLang === 'bilingual') {
+            body.setAttribute('data-lang', 'vi');
+            btn.innerHTML = 'Ngôn ngữ: Tiếng Việt';
+        } else if (currentLang === 'vi') {
+            body.setAttribute('data-lang', 'en');
+            btn.innerHTML = 'Language: English';
+        } else {
+            body.setAttribute('data-lang', 'bilingual');
+            btn.innerHTML = 'Ngôn ngữ: Song ngữ / Bilingual';
+        }
+    }
+
+    function onSubmit() {
+        showResults();
+    }
+
+    renderQuestions();
+    document.getElementById('submitBtn').addEventListener('click', onSubmit);
+
+    document.getElementById('shuffleBtn').addEventListener('click', () => {
+        shuffleArray(shuffledQuestions);
+        renderQuestions();
+        document.getElementById('resultArea').style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+</script>
+</body>
+</html>

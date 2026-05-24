@@ -1,0 +1,318 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Trắc nghiệm Chương 6: Deadlocks (Bế tắc)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 20px;
+            color: #1a2c3a;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 20px 24px 32px;
+        }
+        h1 {
+            font-size: 1.9rem;
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+            color: #0a4b6e;
+            border-left: 6px solid #0a4b6e;
+            padding-left: 20px;
+        }
+        .sub {
+            color: #4b6f86;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            padding-left: 26px;
+        }
+        .question-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid #e4edf2;
+            transition: all 0.1s ease;
+        }
+        .question-text {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 14px;
+            color: #0b2b3b;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-left: 8px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 40px;
+            background: #f9fafc;
+            transition: background 0.2s;
+            border: 1px solid #e2edf2;
+        }
+        .option:hover {
+            background: #eef3fa;
+        }
+        input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2c7da0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .option label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: normal;
+            color: #1e4a6e;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .submit-btn {
+            background: #2c7da0;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 14px 28px;
+            border-radius: 48px;
+            cursor: pointer;
+            margin: 28px 0 20px;
+            width: 100%;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .submit-btn:hover {
+            background: #1f5e7a;
+            transform: scale(0.98);
+        }
+        .result-area {
+            background: #e9f3f7;
+            border-radius: 28px;
+            padding: 18px 24px;
+            margin-top: 15px;
+            display: none;
+            border-left: 8px solid #2c7da0;
+        }
+        .score {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #155f7c;
+        }
+        .answer-review {
+            margin-top: 20px;
+            max-height: 450px;
+            overflow-y: auto;
+            background: #ffffffd9;
+            border-radius: 20px;
+            padding: 8px 12px;
+        }
+        .review-item {
+            border-bottom: 1px solid #dce7ef;
+            padding: 12px 8px;
+        }
+        .correct-ans {
+            color: #1f8a4c;
+            font-weight: 500;
+        }
+        .user-choice {
+            color: #b45353;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 0.75rem;
+            color: #6c8d9e;
+        }
+        @media (max-width: 650px) {
+            .container {
+                padding: 16px;
+            }
+            .question-card {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔒 Chương 6: Deadlocks (Bế tắc)</h1>
+    <div class="sub">✅ 30 câu trắc nghiệm – Chọn đáp án, sau đó nhấn "Nộp bài" để xem kết quả và đáp án</div>
+
+    <div id="questions-container"></div>
+
+    <button class="submit-btn" id="submitBtn">📬 NỘP BÀI & XEM ĐÁP ÁN</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Dựa trên nội dung Chương 6 – Deadlocks: resource types, 4 conditions, RAG, ostrich, detection, recovery, avoidance (Banker), prevention, two-phase locking, non-resource deadlock, starvation</footer>
+</div>
+
+<script>
+    // ---------- 30 CÂU HỎI TRẮC NGHIỆM CHƯƠNG 6 (DEADLOCKS) ----------
+    const questions = [
+        { text: "Deadlock xảy ra khi nào?", options: ["Một process bị treo do lỗi phần cứng", "Mỗi process trong một tập hợp đang chờ sự kiện chỉ do process khác trong tập đó gây ra", "CPU quá tải", "Bộ nhớ không đủ để cấp phát"], correct: 1 },
+        { text: "Điều kiện nào KHÔNG phải là một trong bốn điều kiện cần cho deadlock?", options: ["Mutual exclusion", "Hold and wait", "Preemptive scheduling", "Circular wait"], correct: 2 },
+        { text: "Trong Resource Allocation Graph (RAG), nếu có một chu trình và mỗi loại tài nguyên chỉ có một instance thì:", options: ["Chắc chắn deadlock", "Không deadlock", "Có thể deadlock hoặc không", "Hệ thống đang trong safe state"], correct: 0 },
+        { text: "Chiến lược 'Ostrich algorithm' trong xử lý deadlock có nghĩa là:", options: ["Phát hiện và phục hồi deadlock", "Tránh deadlock bằng thuật toán nhà băng", "Giả vờ không có deadlock, bỏ qua vấn đề", "Ngăn ngừa deadlock bằng cách loại bỏ circular wait"], correct: 2 },
+        { text: "Hệ điều hành nào thường áp dụng Ostrich algorithm đối với deadlock?", options: ["UNIX và Windows", "Chỉ các hệ thống nhúng", "Hệ thống thời gian thực", "Không có hệ điều hành nào"], correct: 0 },
+        { text: "Phương pháp phục hồi deadlock nào là đơn giản nhất (crudest)?", options: ["Preemption (tước tài nguyên)", "Rollback (quay lại checkpoint)", "Killing processes (giết tiến trình)", "Khởi động lại hệ thống"], correct: 2 },
+        { text: "Trong thuật toán phát hiện deadlock với nhiều instance mỗi loại, ma trận R (Request) thể hiện:", options: ["Tài nguyên đã cấp cho mỗi process", "Tài nguyên còn trống", "Tài nguyên mỗi process đang yêu cầu thêm", "Tổng tài nguyên hệ thống"], correct: 2 },
+        { text: "Thuật toán Banker's algorithm dùng để:", options: ["Phát hiện deadlock", "Phục hồi deadlock", "Tránh deadlock (deadlock avoidance)", "Ngăn ngừa deadlock"], correct: 2 },
+        { text: "Trạng thái safe state là trạng thái mà:", options: ["Không có deadlock", "Có một thứ tự cấp phát tài nguyên để tất cả process có thể kết thúc", "Tất cả tài nguyên đều rảnh", "Đã xảy ra deadlock nhưng đã được xử lý"], correct: 1 },
+        { text: "Để ngăn ngừa deadlock bằng cách tấn công điều kiện 'circular wait', người ta thường:", options: ["Spooling các thiết bị", "Yêu cầu process phải xin tất cả tài nguyên ngay từ đầu", "Đặt thứ tự tuyến tính cho các loại tài nguyên và yêu cầu theo thứ tự tăng dần", "Cho phép tước tài nguyên"], correct: 2 },
+        { text: "Kỹ thuật 'spooling' (ví dụ printer daemon) nhằm loại bỏ điều kiện nào?", options: ["Mutual exclusion", "Hold and wait", "No preemption", "Circular wait"], correct: 0 },
+        { text: "Trong deadlock prevention, yêu cầu process phải xin tất cả tài nguyên ngay từ đầu nhằm loại bỏ điều kiện:", options: ["Mutual exclusion", "Hold and wait", "No preemption", "Circular wait"], correct: 1 },
+        { text: "Two-phase locking (khóa hai pha) thường được dùng trong:", options: ["Hệ thống tập tin", "Cơ sở dữ liệu", "Lập lịch CPU", "Quản lý bộ nhớ"], correct: 1 },
+        { text: "Trong two-phase locking, nếu phase 1 không thể khóa tất cả các bản ghi cần thiết, process sẽ:", options: ["Chờ cho đến khi có thể khóa", "Giải phóng các khóa đã có và bắt đầu lại", "Tiếp tục phase 2 với những gì đã khóa", "Gây ra deadlock"], correct: 1 },
+        { text: "Non-resource deadlock (deadlock không do tài nguyên) có thể xảy ra với cơ chế nào?", options: ["Semaphore", "Pipe", "Message queue", "Shared memory"], correct: 0 },
+        { text: "Starvation (đói tài nguyên) khác deadlock ở điểm:", options: ["Starvation là deadlock nhưng có ít process hơn", "Starvation là process bị hoãn vô hạn nhưng không deadlock", "Starvation không thể xảy ra trong thực tế", "Starvation chỉ xảy ra với tài nguyên CPU"], correct: 1 },
+        { text: "Giải pháp đơn giản cho starvation thường là:", options: ["Dùng thuật toán Banker", "Dùng FCFS (First-Come First-Served)", "Tăng số lượng tài nguyên", "Vô hiệu hóa ngắt"], correct: 1 },
+        { text: "Trong deadlock detection với nhiều instance, vector A (Available) ban đầu chứa:", options: ["Tổng tài nguyên hệ thống", "Tài nguyên đã cấp cho mỗi process", "Tài nguyên còn trống", "Tài nguyên mỗi process cần thêm"], correct: 2 },
+        { text: "Khi phục hồi deadlock bằng rollback, checkpoint là:", options: ["Bản sao toàn bộ bộ nhớ", "Trạng thái lưu lại của process để có thể khởi động lại", "Một loại tài nguyên đặc biệt", "Một lệnh hệ thống"], correct: 1 },
+        { text: "Tài nguyên non-preemptable là tài nguyên:", options: ["Có thể bị tước bất kỳ lúc nào", "Không thể tước mà không làm hỏng process", "Chỉ dùng cho kernel", "Luôn được chia sẻ"], correct: 1 },
+        { text: "Trong Banker's algorithm cho một loại tài nguyên, ngân hàng chỉ cấp tài nguyên nếu:", options: ["Trạng thái mới là safe", "Process cần ít tài nguyên nhất", "Process có độ ưu tiên cao", "Tài nguyên còn nhiều"], correct: 0 },
+        { text: "Điều kiện nào sau đây là cần nhưng chưa đủ để deadlock xảy ra khi tài nguyên có nhiều instance?", options: ["Mutual exclusion", "Circular wait", "Hold and wait", "No preemption"], correct: 1 },
+        { text: "Phương pháp tước tài nguyên (preemption) để phục hồi deadlock thường khó áp dụng với:", options: ["CPU", "Bộ nhớ cache", "Máy in (printer) đang in giữa chừng", "Đĩa cứng"], correct: 2 },
+        { text: "Trong Resource Allocation Graph, một cạnh từ tài nguyên R đến process P có nghĩa:", options: ["P đang yêu cầu R", "P đang giữ R", "R đang chờ P", "P đã giải phóng R"], correct: 1 },
+        { text: "Thuật toán Banker cho nhiều loại tài nguyên yêu cầu dữ liệu đầu vào nào?", options: ["E (Existing), A (Available), C (Current allocation), R (Request)", "Chỉ E và A", "Chỉ C và R", "Chỉ A và R"], correct: 0 },
+        { text: "Deadlock avoidance khác deadlock prevention ở điểm:", options: ["Avoidance cần biết trước nhu cầu tối đa của process, prevention thì không", "Prevention hiệu quả hơn", "Avoidance không cần điều kiện gì", "Prevention không thể áp dụng trong thực tế"], correct: 0 },
+        { text: "Trong deadlock detection, nếu sau khi chạy thuật toán vẫn còn process chưa được đánh dấu, điều đó có nghĩa:", options: ["Hệ thống an toàn", "Các process đó đã kết thúc", "Các process đó đang bị deadlock", "Cần chạy lại thuật toán"], correct: 2 },
+        { text: "Tài nguyên nào sau đây thường là non-preemptable?", options: ["CPU time slice", "Máy in", "Thanh ghi CPU", "Bộ nhớ cache"], correct: 1 },
+        { text: "Mục tiêu chính của chương 6 (Deadlocks) là:", options: ["Tăng tốc CPU", "Quản lý bộ nhớ hiệu quả", "Phát triển các phương pháp ngăn ngừa hoặc tránh deadlock", "Tối ưu hóa I/O"], correct: 2 }
+    ];
+
+    // Render tất cả câu hỏi
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        questions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `q-${idx}`;
+
+            const qNumber = idx + 1;
+            const qText = document.createElement('div');
+            qText.className = 'question-text';
+            qText.innerHTML = `${qNumber}. ${q.text}`;
+            card.appendChild(qText);
+
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+
+            q.options.forEach((opt, optIdx) => {
+                const optId = `q${idx}_opt${optIdx}`;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${idx}`;
+                radio.value = optIdx;
+                radio.id = optId;
+
+                const label = document.createElement('label');
+                label.htmlFor = optId;
+                label.textContent = `${String.fromCharCode(65+optIdx)}. ${opt}`;
+
+                optionDiv.appendChild(radio);
+                optionDiv.appendChild(label);
+                optionsDiv.appendChild(optionDiv);
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    function getUserAnswers() {
+        const answers = [];
+        for (let i = 0; i < questions.length; i++) {
+            const radios = document.querySelectorAll(`input[name="question${i}"]`);
+            let selected = null;
+            for (let r of radios) {
+                if (r.checked) {
+                    selected = parseInt(r.value);
+                    break;
+                }
+            }
+            answers.push(selected);
+        }
+        return answers;
+    }
+
+    function showResults() {
+        const userAnswers = getUserAnswers();
+        let correctCount = 0;
+        const reviewItems = [];
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const userChoice = userAnswers[i];
+            const isCorrect = (userChoice !== null && userChoice === q.correct);
+            if (isCorrect) correctCount++;
+
+            let userLetter = userChoice !== null ? String.fromCharCode(65+userChoice) : "❌ Chưa chọn";
+            let correctLetter = String.fromCharCode(65+q.correct);
+            let correctText = q.options[q.correct];
+            let statusText = isCorrect ? "✅ Đúng" : "❌ Sai";
+
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Câu ${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Bạn chọn: ${userLetter} ${userChoice !== null ? q.options[userChoice] : '(chưa chọn)'}</span><br/>
+                    <span class="correct-ans">✔ Đáp án đúng: ${correctLetter}. ${correctText}</span><br/>
+                    <span>${statusText}</span>
+                </div>
+            `);
+        }
+
+        const scorePercent = (correctCount / questions.length * 100).toFixed(1);
+        const resultDiv = document.getElementById('resultArea');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="score">🎯 Điểm số: ${correctCount} / ${questions.length} (${scorePercent}%)</div>
+            <div class="answer-review">
+                <h3>📖 Chi tiết đáp án:</h3>
+                ${reviewItems.join('')}
+            </div>
+            <button id="resetQuizBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Làm lại</button>
+        `;
+        const resetBtn = document.getElementById('resetQuizBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const allRadios = document.querySelectorAll('input[type="radio"]');
+                allRadios.forEach(radio => radio.checked = false);
+                resultDiv.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    }
+
+    function onSubmit() {
+        showResults();
+    }
+
+    renderQuestions();
+    document.getElementById('submitBtn').addEventListener('click', onSubmit);
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Quiz Chapter 5: Input/Output (I/O)</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; color: #1a2c3a; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); padding: 20px 24px 32px; }
+        h1 { font-size: 1.9rem; margin-top: 0; margin-bottom: 0.25rem; color: #0a4b6e; border-left: 6px solid #0a4b6e; padding-left: 20px; }
+        .sub { color: #4b6f86; margin-bottom: 28px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; padding-left: 26px; }
+        .question-card { background: #ffffff; border-radius: 20px; padding: 18px 20px; margin-bottom: 20px; border: 1px solid #e4edf2; }
+        .question-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 14px; color: #0b2b3b; }
+        .options { display: flex; flex-direction: column; gap: 10px; padding-left: 8px; }
+        .option { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 40px; background: #f9fafc; border: 1px solid #e2edf2; }
+        .option:hover { background: #eef3fa; }
+        input[type="radio"] { width: 18px; height: 18px; accent-color: #2c7da0; cursor: pointer; }
+        .option label { flex: 1; cursor: pointer; color: #1e4a6e; }
+        .submit-btn { background: #2c7da0; border: none; color: white; font-size: 1.2rem; font-weight: bold; padding: 14px 28px; border-radius: 48px; cursor: pointer; width: 100%; margin: 28px 0 20px; }
+        .submit-btn:hover { background: #1f5e7a; }
+        .result-area { background: #e9f3f7; border-radius: 28px; padding: 18px 24px; display: none; border-left: 8px solid #2c7da0; }
+        .score { font-size: 1.6rem; font-weight: bold; color: #155f7c; }
+        .answer-review { margin-top: 20px; max-height: 450px; overflow-y: auto; background: #ffffffd9; border-radius: 20px; padding: 8px 12px; }
+        .review-item { border-bottom: 1px solid #dce7ef; padding: 12px 8px; }
+        .correct-ans { color: #1f8a4c; font-weight: 500; }
+        .user-choice { color: #b45353; }
+        footer { text-align: center; margin-top: 25px; font-size: 0.75rem; color: #6c8d9e; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⚙️ Chapter 5: Input/Output (I/O)</h1>
+    <div class="sub">✅ 30 multiple-choice questions – Choose your answer, then click "Submit"</div>
+
+    <div id="questions-container"></div>
+    <button class="submit-btn" id="submitBtn">📬 SUBMIT & VIEW ANSWERS</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Based on Chapter 5 – I/O hardware, programmed I/O, interrupt, DMA, disk scheduling, RAID, display, keyboard</footer>
+</div>
+
+<script>
+    const questions = [
+        { text: "Which of the following devices is a block device?", options: ["Keyboard", "Mouse", "Hard disk", "Serial port"], correct: 2 },
+        { text: "What is a characteristic of a character device?", options: ["Transfers data in blocks", "Can read/write randomly", "Transfers data character by character, without the concept of blocks", "Is always faster than a block device"], correct: 2 },
+        { text: "Which component converts serial data from the device into byte blocks and performs error correction?", options: ["CPU", "Device controller", "DMA controller", "I/O port"], correct: 1 },
+        { text: "The memory-mapped I/O technique allows:", options: ["Accessing device registers through separate IN/OUT instructions", "Mapping device registers into the memory address space, using load/store instructions", "Using interrupts to transfer data", "Increasing interrupt processing speed"], correct: 1 },
+        { text: "In which data transfer method does the CPU continuously check the device status (busy-wait)?", options: ["Programmed I/O (Polling)", "Interrupt-driven I/O", "DMA", "Memory-mapped I/O"], correct: 0 },
+        { text: "In interrupt-driven I/O, how does the device notify the CPU when it's ready?", options: ["By setting a flag in a register", "By sending an interrupt signal", "By writing data directly to memory", "By restarting the system"], correct: 1 },
+        { text: "What is the main advantage of DMA over interrupt-driven I/O?", options: ["It is simpler", "It doesn't need a special controller", "It reduces the CPU load when transferring large blocks of data", "It requires no programming"], correct: 2 },
+        { text: "In a DMA transfer, who directly transfers data between the device and memory?", options: ["CPU", "DMA controller", "Device driver", "Interrupt handler"], correct: 1 },
+        { text: "The 'device independence' goal in I/O software means:", options: ["Each device has its own driver", "Programs can access any device without needing to know about it beforehand", "All devices have the same speed", "Only one type of device is used"], correct: 1 },
+        { text: "Disk access time consists of seek time, rotational latency, and transfer time. Which component is usually the largest?", options: ["Seek time", "Rotational latency", "Transfer time", "All three are equal"], correct: 0 },
+        { text: "Which disk scheduling algorithm moves back and forth like an elevator, serving requests in one direction?", options: ["FCFS", "SSF (Shortest Seek First)", "Elevator (SCAN)", "C-SCAN"], correct: 2 },
+        { text: "What is a characteristic of RAID 1 (mirroring)?", options: ["Striping without redundancy", "Mirrors data across two or more disks", "Uses a dedicated parity disk", "Distributes parity across all disks"], correct: 1 },
+        { text: "Cylinder skew in disk formatting is used to:", options: ["Increase disk capacity", "Reduce wait time when switching tracks due to seek time", "Fix bad sectors", "Encrypt data"], correct: 1 },
+        { text: "The interleaving technique on disks is used to:", options: ["Increase disk rotation speed", "Prevent missing a rotation when the CPU hasn't finished processing the data", "Reduce disk noise", "Increase storage capacity"], correct: 1 },
+        { text: "When encountering a bad sector, what does the 'sector slipping' method do?", options: ["Skips the bad sector, uses a spare one, and shifts subsequent sectors", "Reformats the entire disk", "Increases sector size", "Reduces read speed"], correct: 0 },
+        { text: "In programmed I/O when printing a string, the CPU:", options: ["Writes one character and busy-waits until the printer is ready for the next one", "Only initializes the DMA", "Sleeps until an interrupt occurs", "Copies the entire buffer into I/O memory"], correct: 0 },
+        { text: "In interrupt-driven I/O when printing a string, the CPU typically:", options: ["Writes one character, then sleeps, and on interrupt writes the next", "Uses DMA to write everything", "Polls the ready flag", "Needs no programming"], correct: 0 },
+        { text: "In DMA printing, who is responsible for transferring each character to the printer?", options: ["CPU", "Device driver", "DMA controller", "Interrupt handler"], correct: 2 },
+        { text: "For displays, the memory-mapped display technique means:", options: ["Using separate RAM for the display", "Mapping the video buffer into the CPU's address space; the driver writes directly to it", "Using IN/OUT commands to control pixels", "Using text mode only"], correct: 1 },
+        { text: "What is BitBlt (Bit Block Transfer) in Windows GDI used for?", options: ["Drawing rectangles", "Copying a bitmap region from one location to another", "Changing font sizes", "Managing the keyboard"], correct: 1 },
+        { text: "In disk scheduling, which algorithm can cause starvation for far-away requests?", options: ["FCFS", "Elevator", "SSF (Shortest Seek First)", "C-SCAN"], correct: 2 },
+        { text: "RAID 0 (striping) provides:", options: ["Data redundancy", "Performance increase but no redundancy", "Data mirroring", "Distributed parity"], correct: 1 },
+        { text: "What does a keyboard send to the CPU when a key is pressed?", options: ["An ASCII code", "A scan code", "A Unicode character", "An NMI interrupt"], correct: 1 },
+        { text: "Among these buses, which one generally has the highest speed?", options: ["ISA", "PCI", "USB 1.1", "Serial port"], correct: 1 },
+        { text: "Which component contains parameters such as the number of cylinders, sectors, and disk capacity?", options: ["Boot sector", "Superblock", "Partition table", "Disk controller ROM"], correct: 2 },
+        { text: "When using interrupt-driven I/O, the interrupt service routine (ISR) typically:", options: ["Runs in user mode", "Runs in kernel mode, saves state, handles the device, and notifies the scheduler", "Is not allowed to access global variables", "Simply restarts the system"], correct: 1 },
+        { text: "A hard drive has an average seek time of 6.9 ms, average rotational latency of 4.17 ms, and a transfer time of 0.2 ms. Which is the largest component?", options: ["Seek time", "Rotational latency", "Transfer time", "Both seek and rotational"], correct: 0 },
+        { text: "Which technique allows transferring data between a device and memory without the CPU intervening for every byte?", options: ["Programmed I/O", "Interrupt-driven I/O", "DMA", "Polling"], correct: 2 },
+        { text: "Which I/O software layer is closest to the hardware and directly handles interrupts?", options: ["Device driver", "Interrupt handler", "Device-independent software", "User-level library"], correct: 1 }
+    ];
+
+    questions.forEach(q => {
+        let opts = q.options.map((text, idx) => ({text, isCorrect: idx === q.correct}));
+        for (let i = opts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [opts[i], opts[j]] = [opts[j], opts[i]];
+        }
+        q.options = opts.map(o => o.text);
+        q.correct = opts.findIndex(o => o.isCorrect);
+    });
+
+    let currentQuestions = [...questions];
+    for (let i = currentQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentQuestions[i], currentQuestions[j]] = [currentQuestions[j], currentQuestions[i]];
+    }
+
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        currentQuestions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.innerHTML = `<div class="question-text">${idx + 1}. ${q.text}</div>`;
+            
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+            q.options.forEach((opt, optIdx) => {
+                optionsDiv.innerHTML += `
+                <div class="option">
+                    <input type="radio" name="q${idx}" value="${optIdx}" id="q${idx}o${optIdx}">
+                    <label for="q${idx}o${optIdx}">${String.fromCharCode(65+optIdx)}. ${opt}</label>
+                </div>`;
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+        let correctCount = 0;
+        const reviewItems = [];
+        currentQuestions.forEach((q, i) => {
+            const selected = document.querySelector(`input[name="q${i}"]:checked`);
+            const choice = selected ? parseInt(selected.value) : null;
+            if (choice === q.correct) correctCount++;
+            
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Q${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Your choice: ${choice !== null ? String.fromCharCode(65+choice) + '. ' + q.options[choice] : 'Not selected'}</span><br/>
+                    <span class="correct-ans">✔ Correct: ${String.fromCharCode(65+q.correct)}. ${q.options[q.correct]}</span><br/>
+                    <span>${choice === q.correct ? '✅ Correct' : '❌ Incorrect'}</span>
+                </div>`);
+        });
+
+        const resArea = document.getElementById('resultArea');
+        resArea.style.display = 'block';
+        resArea.innerHTML = `
+            <div class="score">🎯 Score: ${correctCount} / ${currentQuestions.length}</div>
+            <div class="answer-review">${reviewItems.join('')}</div>
+            <button id="resetBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Retry</button>`;
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            resArea.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
+    renderQuestions();
+</script>
+</body>
+</html>

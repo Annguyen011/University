@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="Chi Tiết Code" id="freertos-code-flow">
-        <mxGraphModel dx="587" dy="349" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="1359" dy="680" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -252,42 +252,6 @@
                             <mxPoint x="1580" y="15"/>
                         </Array>
                     </mxGeometry>
-                </mxCell>
-                <mxCell id="P_TITLE" value="CHI TIẾT CƠ CHẾ CƯỚP QUYỀN (PREEMPTION) GIỮA 2 TASK TRÊN CÙNG CORE 1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=16;fontColor=#B85450;" parent="1" vertex="1">
-                    <mxGeometry x="100" y="860" width="800" height="30" as="geometry"/>
-                </mxCell>
-                <mxCell id="P1" value="TaskDieuKhienLED (Pri 1)&#xa;Đang chiếm CPU (Running)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="1" vertex="1">
-                    <mxGeometry x="100" y="920" width="200" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P2" value="Tín hiệu: Có dữ liệu mới&#xa;vào Queue (hopThu)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;" parent="1" vertex="1">
-                    <mxGeometry x="360" y="1020" width="200" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P3" value="FreeRTOS ngắt Task LED&#xa;(Lưu trạng thái - Context Save)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" parent="1" vertex="1">
-                    <mxGeometry x="360" y="920" width="200" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P4" value="TaskHienThiOLED (Pri 2)&#xa;cướp quyền CPU &amp; Thực thi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="620" y="920" width="200" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P5" value="Task OLED xử lý xong,&#xa;chờ nhận Queue (Blocked)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" parent="1" vertex="1">
-                    <mxGeometry x="880" y="920" width="200" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P6" value="FreeRTOS khôi phục Task LED&#xa;(Context Restore) &amp; Chạy tiếp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="1140" y="920" width="220" height="60" as="geometry"/>
-                </mxCell>
-                <mxCell id="P_E1" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P1" target="P3" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="P_E2" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;dashed=1;strokeColor=#d79b00;" parent="1" source="P2" target="P3" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="P_E3" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P3" target="P4" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="P_E4" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P4" target="P5" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="P_E5" style="edgeStyle=orthogonalEdgeStyle;strokeWidth=2;" parent="1" source="P5" target="P6" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

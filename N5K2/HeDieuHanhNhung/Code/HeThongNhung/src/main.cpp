@@ -106,17 +106,14 @@ void TaskHienThiOLED(void* pv) {
     bool dirty = false;
 
     if (cur.nguyHiem != prev.nguyHiem) {
-      xSemaphoreTake(mutexI2C, portMAX_DELAY);
       display.setTextSize(2);
       display.setTextColor(SH110X_WHITE, SH110X_BLACK);
       display.setCursor(0, 0);
       display.print(cur.nguyHiem ? "VA CHAM! " : "AN TOAN  ");
-      xSemaphoreGive(mutexI2C);
       dirty = true;
     }
 
     if (cur.khoangCach != prev.khoangCach) {
-      xSemaphoreTake(mutexI2C, portMAX_DELAY);
       display.setTextSize(1);
       display.setTextColor(SH110X_WHITE, SH110X_BLACK);
       display.setCursor(30, 30);
@@ -126,12 +123,10 @@ void TaskHienThiOLED(void* pv) {
         snprintf(buf, sizeof(buf), "%4dmm", cur.khoangCach);
         display.print(buf);
       }
-      xSemaphoreGive(mutexI2C);
       dirty = true;
     }
 
     if (cur.giaTocX != prev.giaTocX || cur.giaTocY != prev.giaTocY || cur.giaTocZ != prev.giaTocZ) {
-      xSemaphoreTake(mutexI2C, portMAX_DELAY);
       display.setTextSize(1);
       display.setTextColor(SH110X_WHITE, SH110X_BLACK);
 
@@ -144,7 +139,6 @@ void TaskHienThiOLED(void* pv) {
       display.setCursor(99, 42);
       snprintf(buf, sizeof(buf), "%-4d", cur.giaTocZ); display.print(buf);
 
-      xSemaphoreGive(mutexI2C);
       dirty = true;
     }
 

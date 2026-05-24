@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Quiz Chapter 6: Deadlocks</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; color: #1a2c3a; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); padding: 20px 24px 32px; }
+        h1 { font-size: 1.9rem; margin-top: 0; margin-bottom: 0.25rem; color: #0a4b6e; border-left: 6px solid #0a4b6e; padding-left: 20px; }
+        .sub { color: #4b6f86; margin-bottom: 28px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; padding-left: 26px; }
+        .question-card { background: #ffffff; border-radius: 20px; padding: 18px 20px; margin-bottom: 20px; border: 1px solid #e4edf2; }
+        .question-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 14px; color: #0b2b3b; }
+        .options { display: flex; flex-direction: column; gap: 10px; padding-left: 8px; }
+        .option { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 40px; background: #f9fafc; border: 1px solid #e2edf2; }
+        .option:hover { background: #eef3fa; }
+        input[type="radio"] { width: 18px; height: 18px; accent-color: #2c7da0; cursor: pointer; }
+        .option label { flex: 1; cursor: pointer; color: #1e4a6e; }
+        .submit-btn { background: #2c7da0; border: none; color: white; font-size: 1.2rem; font-weight: bold; padding: 14px 28px; border-radius: 48px; cursor: pointer; width: 100%; margin: 28px 0 20px; }
+        .submit-btn:hover { background: #1f5e7a; }
+        .result-area { background: #e9f3f7; border-radius: 28px; padding: 18px 24px; display: none; border-left: 8px solid #2c7da0; }
+        .score { font-size: 1.6rem; font-weight: bold; color: #155f7c; }
+        .answer-review { margin-top: 20px; max-height: 450px; overflow-y: auto; background: #ffffffd9; border-radius: 20px; padding: 8px 12px; }
+        .review-item { border-bottom: 1px solid #dce7ef; padding: 12px 8px; }
+        .correct-ans { color: #1f8a4c; font-weight: 500; }
+        .user-choice { color: #b45353; }
+        footer { text-align: center; margin-top: 25px; font-size: 0.75rem; color: #6c8d9e; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔒 Chapter 6: Deadlocks</h1>
+    <div class="sub">✅ 30 multiple-choice questions – Choose your answer, then click "Submit"</div>
+
+    <div id="questions-container"></div>
+    <button class="submit-btn" id="submitBtn">📬 SUBMIT & VIEW ANSWERS</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Based on Chapter 6 – Deadlocks: resource types, 4 conditions, RAG, ostrich, detection, recovery, avoidance (Banker), prevention...</footer>
+</div>
+
+<script>
+    const questions = [
+        { text: "When does a deadlock occur?", options: ["When a process freezes due to a hardware error", "When each process in a set is waiting for an event that only another process in the set can cause", "When the CPU is overloaded", "When memory is insufficient for allocation"], correct: 1 },
+        { text: "Which of the following is NOT one of the four necessary conditions for a deadlock?", options: ["Mutual exclusion", "Hold and wait", "Preemptive scheduling", "Circular wait"], correct: 2 },
+        { text: "In a Resource Allocation Graph (RAG), if there is a cycle and each resource type has only one instance, then:", options: ["It is definitely a deadlock", "It is not a deadlock", "It may or may not be a deadlock", "The system is in a safe state"], correct: 0 },
+        { text: "What does the 'Ostrich algorithm' strategy in deadlock handling mean?", options: ["Detect and recover from deadlocks", "Avoid deadlocks using the Banker's algorithm", "Pretend deadlocks don't exist and ignore the problem", "Prevent deadlocks by eliminating circular wait"], correct: 2 },
+        { text: "Which operating systems typically apply the Ostrich algorithm for deadlocks?", options: ["UNIX and Windows", "Only embedded systems", "Real-time systems", "No operating system uses it"], correct: 0 },
+        { text: "Which deadlock recovery method is the crudest?", options: ["Preemption", "Rollback (to a checkpoint)", "Killing processes", "Restarting the system"], correct: 2 },
+        { text: "In the deadlock detection algorithm with multiple instances, what does Matrix R (Request) represent?", options: ["Resources already allocated to each process", "Available resources", "Resources each process is currently requesting", "Total system resources"], correct: 2 },
+        { text: "What is the Banker's algorithm used for?", options: ["Deadlock detection", "Deadlock recovery", "Deadlock avoidance", "Deadlock prevention"], correct: 2 },
+        { text: "A safe state is a state where:", options: ["There is no deadlock", "There is an allocation order allowing all processes to finish", "All resources are free", "A deadlock occurred but was handled"], correct: 1 },
+        { text: "To prevent deadlocks by attacking the 'circular wait' condition, one typically:", options: ["Spools the devices", "Requires a process to request all its resources at once initially", "Imposes a linear ordering of resource types and requests them in increasing order", "Allows resource preemption"], correct: 2 },
+        { text: "The technique of 'spooling' (e.g. printer daemon) aims to eliminate which condition?", options: ["Mutual exclusion", "Hold and wait", "No preemption", "Circular wait"], correct: 0 },
+        { text: "In deadlock prevention, requiring a process to request all resources at the very beginning aims to eliminate:", options: ["Mutual exclusion", "Hold and wait", "No preemption", "Circular wait"], correct: 1 },
+        { text: "Two-phase locking is commonly used in:", options: ["File systems", "Databases", "CPU scheduling", "Memory management"], correct: 1 },
+        { text: "In two-phase locking, if phase 1 cannot lock all the required records, the process will:", options: ["Wait until it can lock them", "Release its acquired locks and start over", "Continue to phase 2 with what it has", "Cause a deadlock"], correct: 1 },
+        { text: "Non-resource deadlocks can occur with which mechanism?", options: ["Semaphores", "Pipes", "Message queues", "Shared memory"], correct: 0 },
+        { text: "How does starvation differ from deadlock?", options: ["Starvation is a deadlock with fewer processes", "Starvation means a process is postponed indefinitely, but it's not a deadlock", "Starvation cannot occur in reality", "Starvation only applies to CPU resources"], correct: 1 },
+        { text: "A simple solution to starvation usually is:", options: ["Using the Banker's algorithm", "Using FCFS (First-Come First-Served)", "Increasing the number of resources", "Disabling interrupts"], correct: 1 },
+        { text: "In deadlock detection with multiple instances, what does vector A (Available) initially contain?", options: ["Total system resources", "Resources allocated to each process", "Currently available free resources", "Resources each process needs"], correct: 2 },
+        { text: "When recovering from a deadlock via rollback, a checkpoint is:", options: ["A copy of the entire memory", "The saved state of a process to restart from", "A special type of resource", "A system command"], correct: 1 },
+        { text: "A non-preemptable resource is a resource that:", options: ["Can be preempted at any time", "Cannot be taken away without causing the computation to fail", "Is only used for the kernel", "Is always shared"], correct: 1 },
+        { text: "In the Banker's algorithm for a single resource type, the banker only grants resources if:", options: ["The new state is safe", "The process needs the fewest resources", "The process has high priority", "Many resources are left"], correct: 0 },
+        { text: "Which condition is necessary but not sufficient for a deadlock to occur when a resource has multiple instances?", options: ["Mutual exclusion", "Circular wait", "Hold and wait", "No preemption"], correct: 1 },
+        { text: "The preemption method for deadlock recovery is often difficult to apply to:", options: ["The CPU", "Cache memory", "A printer in the middle of a print job", "Hard disks"], correct: 2 },
+        { text: "In a Resource Allocation Graph, an edge from resource R to process P means:", options: ["P is requesting R", "P is currently holding R", "R is waiting for P", "P has released R"], correct: 1 },
+        { text: "What input data does the Banker's algorithm for multiple resource types require?", options: ["E (Existing), A (Available), C (Current allocation), R (Request)", "Only E and A", "Only C and R", "Only A and R"], correct: 0 },
+        { text: "How does deadlock avoidance differ from deadlock prevention?", options: ["Avoidance requires knowing the maximum resource needs in advance, prevention does not", "Prevention is more efficient", "Avoidance doesn't need any conditions", "Prevention cannot be applied in practice"], correct: 0 },
+        { text: "In deadlock detection, if unmarked processes remain after running the algorithm, it means:", options: ["The system is safe", "Those processes have finished", "Those processes are deadlocked", "The algorithm must be rerun"], correct: 2 },
+        { text: "Which of the following resources is typically non-preemptable?", options: ["A CPU time slice", "A printer", "CPU registers", "Cache memory"], correct: 1 },
+        { text: "The main goal of Chapter 6 (Deadlocks) is to:", options: ["Speed up the CPU", "Manage memory effectively", "Develop methods to prevent or avoid deadlocks", "Optimize I/O"], correct: 2 }
+    ];
+
+    questions.forEach(q => {
+        let opts = q.options.map((text, idx) => ({text, isCorrect: idx === q.correct}));
+        for (let i = opts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [opts[i], opts[j]] = [opts[j], opts[i]];
+        }
+        q.options = opts.map(o => o.text);
+        q.correct = opts.findIndex(o => o.isCorrect);
+    });
+
+    let currentQuestions = [...questions];
+    for (let i = currentQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentQuestions[i], currentQuestions[j]] = [currentQuestions[j], currentQuestions[i]];
+    }
+
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        currentQuestions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.innerHTML = `<div class="question-text">${idx + 1}. ${q.text}</div>`;
+            
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+            q.options.forEach((opt, optIdx) => {
+                optionsDiv.innerHTML += `
+                <div class="option">
+                    <input type="radio" name="q${idx}" value="${optIdx}" id="q${idx}o${optIdx}">
+                    <label for="q${idx}o${optIdx}">${String.fromCharCode(65+optIdx)}. ${opt}</label>
+                </div>`;
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+        let correctCount = 0;
+        const reviewItems = [];
+        currentQuestions.forEach((q, i) => {
+            const selected = document.querySelector(`input[name="q${i}"]:checked`);
+            const choice = selected ? parseInt(selected.value) : null;
+            if (choice === q.correct) correctCount++;
+            
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Q${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Your choice: ${choice !== null ? String.fromCharCode(65+choice) + '. ' + q.options[choice] : 'Not selected'}</span><br/>
+                    <span class="correct-ans">✔ Correct: ${String.fromCharCode(65+q.correct)}. ${q.options[q.correct]}</span><br/>
+                    <span>${choice === q.correct ? '✅ Correct' : '❌ Incorrect'}</span>
+                </div>`);
+        });
+
+        const resArea = document.getElementById('resultArea');
+        resArea.style.display = 'block';
+        resArea.innerHTML = `
+            <div class="score">🎯 Score: ${correctCount} / ${currentQuestions.length}</div>
+            <div class="answer-review">${reviewItems.join('')}</div>
+            <button id="resetBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Retry</button>`;
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            resArea.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
+    renderQuestions();
+</script>
+</body>
+</html>

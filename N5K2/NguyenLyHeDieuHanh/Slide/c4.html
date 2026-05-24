@@ -1,0 +1,321 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Trắc nghiệm Chương 4: Hệ thống tập tin (File Systems)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 20px;
+            color: #1a2c3a;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 20px 24px 32px;
+        }
+        h1 {
+            font-size: 1.9rem;
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+            color: #0a4b6e;
+            border-left: 6px solid #0a4b6e;
+            padding-left: 20px;
+        }
+        .sub {
+            color: #4b6f86;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            padding-left: 26px;
+        }
+        .question-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid #e4edf2;
+            transition: all 0.1s ease;
+        }
+        .question-text {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 14px;
+            color: #0b2b3b;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-left: 8px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 40px;
+            background: #f9fafc;
+            transition: background 0.2s;
+            border: 1px solid #e2edf2;
+        }
+        .option:hover {
+            background: #eef3fa;
+        }
+        input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2c7da0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .option label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: normal;
+            color: #1e4a6e;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .submit-btn {
+            background: #2c7da0;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 14px 28px;
+            border-radius: 48px;
+            cursor: pointer;
+            margin: 28px 0 20px;
+            width: 100%;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .submit-btn:hover {
+            background: #1f5e7a;
+            transform: scale(0.98);
+        }
+        .result-area {
+            background: #e9f3f7;
+            border-radius: 28px;
+            padding: 18px 24px;
+            margin-top: 15px;
+            display: none;
+            border-left: 8px solid #2c7da0;
+        }
+        .score {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #155f7c;
+        }
+        .answer-review {
+            margin-top: 20px;
+            max-height: 450px;
+            overflow-y: auto;
+            background: #ffffffd9;
+            border-radius: 20px;
+            padding: 8px 12px;
+        }
+        .review-item {
+            border-bottom: 1px solid #dce7ef;
+            padding: 12px 8px;
+        }
+        .correct-ans {
+            color: #1f8a4c;
+            font-weight: 500;
+        }
+        .user-choice {
+            color: #b45353;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 0.75rem;
+            color: #6c8d9e;
+        }
+        @media (max-width: 650px) {
+            .container {
+                padding: 16px;
+            }
+            .question-card {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📁 Chương 4: Hệ thống tập tin (File Systems)</h1>
+    <div class="sub">✅ 30 câu trắc nghiệm – Chọn đáp án, sau đó nhấn "Nộp bài" để xem kết quả và đáp án</div>
+
+    <div id="questions-container"></div>
+
+    <button class="submit-btn" id="submitBtn">📬 NỘP BÀI & XEM ĐÁP ÁN</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Dựa trên nội dung Chương 4 – Files, Directories, Allocation methods, FAT, inode, UNIX V7</footer>
+</div>
+
+<script>
+    // ---------- 30 CÂU HỎI TRẮC NGHIỆM CHƯƠNG 4 ----------
+    const questions = [
+        { text: "Mục đích chính của hệ thống tập tin (file system) là gì?", options: ["Quản lý bộ nhớ chính", "Lưu trữ thông tin lâu dài, cho phép nhiều tiến trình truy cập đồng thời", "Điều phối CPU", "Quản lý tiến trình"], correct: 1 },
+        { text: "Loại cấu trúc file nào phổ biến trong UNIX và Windows?", options: ["Record sequence", "Byte sequence", "Tree structure", "Block sequence"], correct: 1 },
+        { text: "Thao tác nào sau đây KHÔNG phải là thao tác cơ bản trên tập tin?", options: ["Open", "Seek", "Fork", "Close"], correct: 2 },
+        { text: "Thuộc tính 'Archive flag' của file dùng để:", options: ["Đánh dấu file chỉ đọc", "Đánh dấu file cần được backup", "Đánh dấu file là hệ thống", "Đánh dấu file tạm thời"], correct: 1 },
+        { text: "Sequential access (truy cập tuần tự) phù hợp với loại thiết bị nào nhất?", options: ["Đĩa cứng", "Băng từ", "RAM", "Cache"], correct: 1 },
+        { text: "Kỹ thuật memory-mapped files cho phép:", options: ["Ánh xạ file vào không gian địa chỉ của process, truy cập như bộ nhớ", "Nén file để tiết kiệm dung lượng", "Mã hóa file tự động", "Sao lưu file theo thời gian thực"], correct: 0 },
+        { text: "Cấu trúc thư mục hai cấp (two-level) giải quyết vấn đề gì của thư mục một cấp?", options: ["Phân mảnh đĩa", "Trùng tên file giữa các người dùng", "Tốc độ truy cập chậm", "Giới hạn kích thước file"], correct: 1 },
+        { text: "Trong cây thư mục UNIX, đường dẫn tuyệt đối (absolute path) bắt đầu từ:", options: ["Thư mục hiện tại", "Thư mục gốc '/'", "Thư mục home của user", "Thư mục /usr"], correct: 1 },
+        { text: "Phương pháp cấp phát contiguous (các khối liên tục) có nhược điểm chính là:", options: ["Không hỗ trợ truy cập ngẫu nhiên", "Gây phân mảnh ngoại và khó mở rộng file", "Tốn bộ nhớ cho bảng chỉ mục", "Truy cập chậm"], correct: 1 },
+        { text: "Linked allocation (cấp phát liên kết) được dùng trong hệ thống tập tin nào?", options: ["NTFS", "FAT (MS-DOS)", "ext4", "HFS+"], correct: 1 },
+        { text: "Trong indexed allocation, index block (khối chỉ mục) chứa:", options: ["Nội dung dữ liệu của file", "Danh sách các con trỏ đến các khối dữ liệu", "Tên file và thuộc tính", "Bảng FAT"], correct: 1 },
+        { text: "Inode trong UNIX chứa thông tin gì?", options: ["Tên file", "Metadata của file (quyền, kích thước, địa chỉ khối, ...)", "Nội dung file", "Thư mục chứa file"], correct: 1 },
+        { text: "Trong UNIX inode, cơ chế indirect block dùng để:", options: ["Lưu trực tiếp dữ liệu", "Trỏ đến các khối dữ liệu khi file lớn hơn direct blocks", "Lưu tên file dài", "Quản lý thư mục"], correct: 1 },
+        { text: "Hard link là gì?", options: ["Một liên kết tượng trưng (symlink)", "Một mục nhập thư mục trực tiếp trỏ đến cùng inode", "Một bản sao của file", "Một file đặc biệt chứa đường dẫn"], correct: 1 },
+        { text: "Symbolic link (soft link) khác hard link ở điểm:", options: ["Symbolic link có thể trỏ đến file trên khác phân vùng", "Symbolic link không thể trỏ đến thư mục", "Hard link không thể trỏ đến file", "Symbolic link chiếm ít dung lượng hơn"], correct: 0 },
+        { text: "Phương pháp quản lý vùng trống nào hiệu quả cho việc tìm vùng khối liên tục?", options: ["Linked list", "Bit map", "FAT", "Inode"], correct: 1 },
+        { text: "FAT (File Allocation Table) được lưu ở đâu để tăng tốc truy cập?", options: ["Trên đĩa và được đọc vào RAM khi cần", "Chỉ trên đĩa cứng", "Chỉ trong cache CPU", "Trong ROM"], correct: 0 },
+        { text: "Trong MS-DOS FAT, một directory entry cơ bản (8.3) chiếm bao nhiêu byte?", options: ["16 byte", "32 byte", "64 byte", "128 byte"], correct: 1 },
+        { text: "Windows 98 hỗ trợ tên file dài bằng cách:", options: ["Mở rộng kích thước directory entry", "Dùng nhiều directory entry liên tiếp để lưu tên Unicode", "Lưu tên trong một file riêng", "Không hỗ trợ"], correct: 1 },
+        { text: "Trong UNIX V7, directory entry chứa những gì?", options: ["inode number và tên file", "toàn bộ thuộc tính file", "địa chỉ khối đầu tiên", "kích thước file"], correct: 0 },
+        { text: "Kích thước khối (block size) lớn mang lại lợi ích gì?", options: ["Ít phân mảnh nội bộ hơn", "Hiệu suất truyền dữ liệu cao hơn", "Quản lý dễ dàng hơn", "Tiết kiệm không gian đĩa"], correct: 1 },
+        { text: "Phương pháp cấp phát nào thường được dùng cho CD-ROM (biết trước kích thước, không xóa)?", options: ["Contiguous", "Linked", "Indexed", "FAT"], correct: 0 },
+        { text: "Trong UNIX, superblock chứa thông tin gì?", options: ["Nội dung file", "Thông tin toàn bộ hệ thống tập tin (kích thước, số inode, danh sách khối trống)", "Bảng phân đoạn", "Bảng trang"], correct: 1 },
+        { text: "Thao tác 'link' trong UNIX tạo ra:", options: ["Hard link", "Symbolic link", "Bản sao file", "File nén"], correct: 0 },
+        { text: "Điều gì xảy ra khi xóa file gốc mà vẫn còn hard link?", options: ["Dữ liệu vẫn tồn tại, hard link vẫn truy cập được", "Dữ liệu bị xóa ngay lập tức", "Hard link trở thành symbolic link", "Hệ thống báo lỗi"], correct: 0 },
+        { text: "FAT-12 có kích thước tối đa phân vùng khoảng bao nhiêu với block 4KB?", options: ["2MB", "16MB", "128MB", "2GB"], correct: 1 },
+        { text: "Trong indexed allocation, ưu điểm chính so với linked allocation là:", options: ["Tiết kiệm không gian hơn", "Hỗ trợ truy cập ngẫu nhiên tốt", "Đơn giản hơn", "Không cần bảng chỉ mục"], correct: 1 },
+        { text: "Thư mục (directory) trong hệ thống tập tin có vai trò:", options: ["Tổ chức các file thành cấu trúc phân cấp", "Lưu nội dung file", "Quản lý bộ nhớ cache", "Điều phối I/O"], correct: 0 },
+        { text: "Trong các hệ thống tập tin hiện đại, phương pháp cấp phát được dùng phổ biến nhất là:", options: ["Contiguous", "Linked", "Indexed (hoặc kết hợp)", "FAT"], correct: 2 }
+    ];
+
+    // Render tất cả câu hỏi
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        questions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `q-${idx}`;
+
+            const qNumber = idx + 1;
+            const qText = document.createElement('div');
+            qText.className = 'question-text';
+            qText.innerHTML = `${qNumber}. ${q.text}`;
+            card.appendChild(qText);
+
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+
+            q.options.forEach((opt, optIdx) => {
+                const optId = `q${idx}_opt${optIdx}`;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${idx}`;
+                radio.value = optIdx;
+                radio.id = optId;
+
+                const label = document.createElement('label');
+                label.htmlFor = optId;
+                label.textContent = `${String.fromCharCode(65+optIdx)}. ${opt}`; // A., B., C., D.
+
+                optionDiv.appendChild(radio);
+                optionDiv.appendChild(label);
+                optionsDiv.appendChild(optionDiv);
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    // Lấy đáp án người dùng
+    function getUserAnswers() {
+        const answers = [];
+        for (let i = 0; i < questions.length; i++) {
+            const radios = document.querySelectorAll(`input[name="question${i}"]`);
+            let selected = null;
+            for (let r of radios) {
+                if (r.checked) {
+                    selected = parseInt(r.value);
+                    break;
+                }
+            }
+            answers.push(selected);
+        }
+        return answers;
+    }
+
+    // Hiển thị kết quả và đáp án
+    function showResults() {
+        const userAnswers = getUserAnswers();
+        let correctCount = 0;
+        const reviewItems = [];
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const userChoice = userAnswers[i];
+            const isCorrect = (userChoice !== null && userChoice === q.correct);
+            if (isCorrect) correctCount++;
+
+            let userLetter = userChoice !== null ? String.fromCharCode(65+userChoice) : "❌ Chưa chọn";
+            let correctLetter = String.fromCharCode(65+q.correct);
+            let correctText = q.options[q.correct];
+            let statusText = isCorrect ? "✅ Đúng" : "❌ Sai";
+
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Câu ${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Bạn chọn: ${userLetter} ${userChoice !== null ? q.options[userChoice] : '(chưa chọn)'}</span><br/>
+                    <span class="correct-ans">✔ Đáp án đúng: ${correctLetter}. ${correctText}</span><br/>
+                    <span>${statusText}</span>
+                </div>
+            `);
+        }
+
+        const scorePercent = (correctCount / questions.length * 100).toFixed(1);
+        const resultDiv = document.getElementById('resultArea');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="score">🎯 Điểm số: ${correctCount} / ${questions.length} (${scorePercent}%)</div>
+            <div class="answer-review">
+                <h3>📖 Chi tiết đáp án:</h3>
+                ${reviewItems.join('')}
+            </div>
+            <button id="resetQuizBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Làm lại</button>
+        `;
+        // Reset toàn bộ
+        const resetBtn = document.getElementById('resetQuizBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const allRadios = document.querySelectorAll('input[type="radio"]');
+                allRadios.forEach(radio => radio.checked = false);
+                resultDiv.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    }
+
+    function onSubmit() {
+        showResults();
+    }
+
+    renderQuestions();
+    document.getElementById('submitBtn').addEventListener('click', onSubmit);
+</script>
+</body>
+</html>

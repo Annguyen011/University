@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Quiz Chapter 4: File Systems</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; color: #1a2c3a; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); padding: 20px 24px 32px; }
+        h1 { font-size: 1.9rem; margin-top: 0; margin-bottom: 0.25rem; color: #0a4b6e; border-left: 6px solid #0a4b6e; padding-left: 20px; }
+        .sub { color: #4b6f86; margin-bottom: 28px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; padding-left: 26px; }
+        .question-card { background: #ffffff; border-radius: 20px; padding: 18px 20px; margin-bottom: 20px; border: 1px solid #e4edf2; }
+        .question-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 14px; color: #0b2b3b; }
+        .options { display: flex; flex-direction: column; gap: 10px; padding-left: 8px; }
+        .option { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 40px; background: #f9fafc; border: 1px solid #e2edf2; }
+        .option:hover { background: #eef3fa; }
+        input[type="radio"] { width: 18px; height: 18px; accent-color: #2c7da0; cursor: pointer; }
+        .option label { flex: 1; cursor: pointer; color: #1e4a6e; }
+        .submit-btn { background: #2c7da0; border: none; color: white; font-size: 1.2rem; font-weight: bold; padding: 14px 28px; border-radius: 48px; cursor: pointer; width: 100%; margin: 28px 0 20px; }
+        .submit-btn:hover { background: #1f5e7a; }
+        .result-area { background: #e9f3f7; border-radius: 28px; padding: 18px 24px; display: none; border-left: 8px solid #2c7da0; }
+        .score { font-size: 1.6rem; font-weight: bold; color: #155f7c; }
+        .answer-review { margin-top: 20px; max-height: 450px; overflow-y: auto; background: #ffffffd9; border-radius: 20px; padding: 8px 12px; }
+        .review-item { border-bottom: 1px solid #dce7ef; padding: 12px 8px; }
+        .correct-ans { color: #1f8a4c; font-weight: 500; }
+        .user-choice { color: #b45353; }
+        footer { text-align: center; margin-top: 25px; font-size: 0.75rem; color: #6c8d9e; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📁 Chapter 4: File Systems</h1>
+    <div class="sub">✅ 29 multiple-choice questions – Choose your answer, then click "Submit"</div>
+
+    <div id="questions-container"></div>
+    <button class="submit-btn" id="submitBtn">📬 SUBMIT & VIEW ANSWERS</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Based on Chapter 4 – Files, Directories, Allocation methods, FAT, inode, UNIX V7</footer>
+</div>
+
+<script>
+    const questions = [
+        { text: "What is the main purpose of a file system?", options: ["Manage main memory", "Store information long-term and allow concurrent process access", "Schedule the CPU", "Manage processes"], correct: 1 },
+        { text: "Which file structure is common in UNIX and Windows?", options: ["Record sequence", "Byte sequence", "Tree structure", "Block sequence"], correct: 1 },
+        { text: "Which of the following is NOT a basic file operation?", options: ["Open", "Seek", "Fork", "Close"], correct: 2 },
+        { text: "The 'Archive flag' attribute is used to:", options: ["Mark a read-only file", "Mark a file that needs to be backed up", "Mark a system file", "Mark a temporary file"], correct: 1 },
+        { text: "Sequential access is most suitable for which type of device?", options: ["Hard disk", "Magnetic tape", "RAM", "Cache"], correct: 1 },
+        { text: "Memory-mapped files technique allows:", options: ["Mapping a file into a process's address space to access it like memory", "Compressing files to save space", "Encrypting files automatically", "Backing up files in real-time"], correct: 0 },
+        { text: "What problem does a two-level directory structure solve compared to a single-level directory?", options: ["Disk fragmentation", "File name collisions between users", "Slow access speed", "File size limits"], correct: 1 },
+        { text: "In the UNIX directory tree, an absolute path starts from:", options: ["The current directory", "The root directory '/'", "The user's home directory", "The /usr directory"], correct: 1 },
+        { text: "What is the main drawback of contiguous allocation?", options: ["It doesn't support random access", "It causes external fragmentation and makes file expansion difficult", "It wastes memory on index tables", "It's slow"], correct: 1 },
+        { text: "Linked allocation is used in which file system?", options: ["NTFS", "FAT (MS-DOS)", "ext4", "HFS+"], correct: 1 },
+        { text: "In indexed allocation, what does the index block contain?", options: ["File data content", "Pointers to the data blocks", "File name and attributes", "The FAT table"], correct: 1 },
+        { text: "What information does a UNIX Inode contain?", options: ["File name", "File metadata (permissions, size, block addresses...)", "File content", "The directory containing the file"], correct: 1 },
+        { text: "In a UNIX inode, what is the indirect block used for?", options: ["Storing data directly", "Pointing to data blocks when the file exceeds the direct blocks' capacity", "Storing long file names", "Managing directories"], correct: 1 },
+        { text: "What is a hard link?", options: ["A symbolic link", "A directory entry pointing directly to the same inode", "A copy of the file", "A special file containing a path"], correct: 1 },
+        { text: "How does a symbolic link differ from a hard link?", options: ["Symbolic links can point to files on different partitions", "Symbolic links cannot point to directories", "Hard links cannot point to files", "Symbolic links use less space"], correct: 0 },
+        { text: "Which free-space management method is efficient for finding contiguous free blocks?", options: ["Linked list", "Bit map", "FAT", "Inode"], correct: 1 },
+        { text: "Where is the FAT (File Allocation Table) stored to speed up access?", options: ["On the disk and read into RAM when needed", "Only on the hard disk", "Only in the CPU cache", "In ROM"], correct: 0 },
+        { text: "In MS-DOS FAT, how many bytes does a standard directory entry (8.3) occupy?", options: ["16 bytes", "32 bytes", "64 bytes", "128 bytes"], correct: 1 },
+        { text: "How did Windows 98 support long file names?", options: ["By expanding the directory entry size", "By using multiple consecutive directory entries to store Unicode names", "By storing names in a separate file", "It didn't support them"], correct: 1 },
+        { text: "In UNIX V7, what does a directory entry contain?", options: ["Inode number and file name", "All file attributes", "The first block address", "File size"], correct: 0 },
+        { text: "What is the benefit of a large block size?", options: ["Less internal fragmentation", "Higher data transfer rate/efficiency", "Easier management", "Saves disk space"], correct: 1 },
+        { text: "Which allocation method is typically used for CD-ROMs (known size, read-only)?", options: ["Contiguous", "Linked", "Indexed", "FAT"], correct: 0 },
+        { text: "In UNIX, what does the superblock contain?", options: ["File content", "Information about the entire file system (size, inode count, free blocks)", "Segmentation table", "Page table"], correct: 1 },
+        { text: "The 'link' operation in UNIX creates a:", options: ["Hard link", "Symbolic link", "File copy", "Compressed file"], correct: 0 },
+        { text: "What happens if you delete the original file but a hard link still remains?", options: ["The data still exists and the hard link can access it", "The data is deleted immediately", "The hard link becomes a symbolic link", "The system throws an error"], correct: 0 },
+        { text: "What is the maximum partition size for FAT-12 with 4KB blocks?", options: ["2MB", "16MB", "128MB", "2GB"], correct: 1 },
+        { text: "Compared to linked allocation, what is the main advantage of indexed allocation?", options: ["It saves more space", "It supports random access well", "It is simpler", "It doesn't require index tables"], correct: 1 },
+        { text: "What is the role of a directory in a file system?", options: ["To organize files into a hierarchical structure", "To store file content", "To manage the cache", "To coordinate I/O"], correct: 0 },
+        { text: "In modern file systems, the most commonly used allocation method is:", options: ["Contiguous", "Linked", "Indexed (or a combination)", "FAT"], correct: 2 }
+    ];
+
+    questions.forEach(q => {
+        let opts = q.options.map((text, idx) => ({text, isCorrect: idx === q.correct}));
+        for (let i = opts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [opts[i], opts[j]] = [opts[j], opts[i]];
+        }
+        q.options = opts.map(o => o.text);
+        q.correct = opts.findIndex(o => o.isCorrect);
+    });
+
+    let currentQuestions = [...questions];
+    for (let i = currentQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentQuestions[i], currentQuestions[j]] = [currentQuestions[j], currentQuestions[i]];
+    }
+
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        currentQuestions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.innerHTML = `<div class="question-text">${idx + 1}. ${q.text}</div>`;
+            
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+            q.options.forEach((opt, optIdx) => {
+                optionsDiv.innerHTML += `
+                <div class="option">
+                    <input type="radio" name="q${idx}" value="${optIdx}" id="q${idx}o${optIdx}">
+                    <label for="q${idx}o${optIdx}">${String.fromCharCode(65+optIdx)}. ${opt}</label>
+                </div>`;
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+        let correctCount = 0;
+        const reviewItems = [];
+        currentQuestions.forEach((q, i) => {
+            const selected = document.querySelector(`input[name="q${i}"]:checked`);
+            const choice = selected ? parseInt(selected.value) : null;
+            if (choice === q.correct) correctCount++;
+            
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Q${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Your choice: ${choice !== null ? String.fromCharCode(65+choice) + '. ' + q.options[choice] : 'Not selected'}</span><br/>
+                    <span class="correct-ans">✔ Correct: ${String.fromCharCode(65+q.correct)}. ${q.options[q.correct]}</span><br/>
+                    <span>${choice === q.correct ? '✅ Correct' : '❌ Incorrect'}</span>
+                </div>`);
+        });
+
+        const resArea = document.getElementById('resultArea');
+        resArea.style.display = 'block';
+        resArea.innerHTML = `
+            <div class="score">🎯 Score: ${correctCount} / ${currentQuestions.length}</div>
+            <div class="answer-review">${reviewItems.join('')}</div>
+            <button id="resetBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Retry</button>`;
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            resArea.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
+    renderQuestions();
+</script>
+</body>
+</html>

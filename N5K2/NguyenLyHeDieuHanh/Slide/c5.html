@@ -1,0 +1,320 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Trắc nghiệm Chương 5: Nhập/Xuất (I/O)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 20px;
+            color: #1a2c3a;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 20px 24px 32px;
+        }
+        h1 {
+            font-size: 1.9rem;
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+            color: #0a4b6e;
+            border-left: 6px solid #0a4b6e;
+            padding-left: 20px;
+        }
+        .sub {
+            color: #4b6f86;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            padding-left: 26px;
+        }
+        .question-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid #e4edf2;
+            transition: all 0.1s ease;
+        }
+        .question-text {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 14px;
+            color: #0b2b3b;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-left: 8px;
+        }
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 40px;
+            background: #f9fafc;
+            transition: background 0.2s;
+            border: 1px solid #e2edf2;
+        }
+        .option:hover {
+            background: #eef3fa;
+        }
+        input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2c7da0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .option label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: normal;
+            color: #1e4a6e;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .submit-btn {
+            background: #2c7da0;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 14px 28px;
+            border-radius: 48px;
+            cursor: pointer;
+            margin: 28px 0 20px;
+            width: 100%;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .submit-btn:hover {
+            background: #1f5e7a;
+            transform: scale(0.98);
+        }
+        .result-area {
+            background: #e9f3f7;
+            border-radius: 28px;
+            padding: 18px 24px;
+            margin-top: 15px;
+            display: none;
+            border-left: 8px solid #2c7da0;
+        }
+        .score {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #155f7c;
+        }
+        .answer-review {
+            margin-top: 20px;
+            max-height: 450px;
+            overflow-y: auto;
+            background: #ffffffd9;
+            border-radius: 20px;
+            padding: 8px 12px;
+        }
+        .review-item {
+            border-bottom: 1px solid #dce7ef;
+            padding: 12px 8px;
+        }
+        .correct-ans {
+            color: #1f8a4c;
+            font-weight: 500;
+        }
+        .user-choice {
+            color: #b45353;
+        }
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 0.75rem;
+            color: #6c8d9e;
+        }
+        @media (max-width: 650px) {
+            .container {
+                padding: 16px;
+            }
+            .question-card {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⚙️ Chương 5: Nhập/Xuất (Input/Output)</h1>
+    <div class="sub">✅ 30 câu trắc nghiệm – Chọn đáp án, sau đó nhấn "Nộp bài" để xem kết quả và đáp án</div>
+
+    <div id="questions-container"></div>
+
+    <button class="submit-btn" id="submitBtn">📬 NỘP BÀI & XEM ĐÁP ÁN</button>
+    <div id="resultArea" class="result-area"></div>
+    <footer>Dựa trên nội dung Chương 5 – I/O hardware, programmed I/O, interrupt, DMA, disk scheduling, RAID, display, keyboard</footer>
+</div>
+
+<script>
+    // ---------- 30 CÂU HỎI TRẮC NGHIỆM CHƯƠNG 5 ----------
+    const questions = [
+        { text: "Thiết bị nào sau đây thuộc loại block device?", options: ["Bàn phím", "Chuột", "Đĩa cứng", "Cổng serial"], correct: 2 },
+        { text: "Đặc điểm của character device là:", options: ["Truyền dữ liệu theo khối", "Có thể đọc/ghi ngẫu nhiên", "Truyền dữ liệu theo từng ký tự, không có khái niệm khối", "Luôn nhanh hơn block device"], correct: 2 },
+        { text: "Thành phần nào chuyển đổi dữ liệu nối tiếp từ thiết bị thành khối byte và thực hiện sửa lỗi?", options: ["CPU", "Device controller", "DMA controller", "I/O port"], correct: 1 },
+        { text: "Kỹ thuật memory-mapped I/O cho phép:", options: ["Truy cập thanh ghi thiết bị thông qua lệnh IN/OUT riêng", "Ánh xạ thanh ghi thiết bị vào không gian địa chỉ bộ nhớ, dùng lệnh load/store", "Sử dụng ngắt để truyền dữ liệu", "Tăng tốc độ xử lý ngắt"], correct: 1 },
+        { text: "Phương pháp truyền dữ liệu nào CPU phải liên tục kiểm tra trạng thái thiết bị (busy-wait)?", options: ["Programmed I/O (Polling)", "Interrupt-driven I/O", "DMA", "Memory-mapped I/O"], correct: 0 },
+        { text: "Trong interrupt-driven I/O, thiết bị báo cho CPU khi sẵn sàng bằng cách:", options: ["Đặt cờ trong thanh ghi", "Gửi tín hiệu ngắt (interrupt)", "Ghi dữ liệu trực tiếp vào bộ nhớ", "Khởi động lại hệ thống"], correct: 1 },
+        { text: "DMA (Direct Memory Access) có ưu điểm chính gì so với interrupt-driven I/O?", options: ["Đơn giản hơn", "Không cần bộ điều khiển đặc biệt", "Giảm tải cho CPU khi truyền khối dữ liệu lớn", "Không cần lập trình"], correct: 2 },
+        { text: "Trong DMA transfer, ai là người trực tiếp chuyển dữ liệu giữa thiết bị và bộ nhớ?", options: ["CPU", "DMA controller", "Device driver", "Interrupt handler"], correct: 1 },
+        { text: "Mục tiêu 'device independence' trong I/O software có nghĩa là:", options: ["Mỗi thiết bị có driver riêng", "Chương trình có thể truy cập bất kỳ thiết bị nào mà không cần biết trước", "Tất cả thiết bị đều có cùng tốc độ", "Chỉ dùng một loại thiết bị duy nhất"], correct: 1 },
+        { text: "Thời gian truy cập đĩa gồm ba thành phần: seek time, rotational latency và transfer time. Thành phần nào thường lớn nhất?", options: ["Seek time", "Rotational latency", "Transfer time", "Cả ba bằng nhau"], correct: 0 },
+        { text: "Thuật toán lập lịch đầu đọc nào di chuyển qua lại như thang máy, phục vụ các yêu cầu theo một hướng?", options: ["FCFS", "SSF (Shortest Seek First)", "Elevator (SCAN)", "C-SCAN"], correct: 2 },
+        { text: "RAID 1 (mirroring) có đặc điểm:", options: ["Striping không dự phòng", "Nhân đôi dữ liệu trên hai đĩa trở lên", "Dùng một đĩa chuyên cho parity", "Phân tán parity trên tất cả đĩa"], correct: 1 },
+        { text: "Cylinder skew trong định dạng đĩa dùng để:", options: ["Tăng dung lượng đĩa", "Giảm thời gian chờ khi chuyển track do seek time", "Sửa lỗi bad sector", "Mã hóa dữ liệu"], correct: 1 },
+        { text: "Kỹ thuật interleaving (đan xen) trên đĩa dùng để:", options: ["Tăng tốc độ quay đĩa", "Tránh mất vòng quay khi CPU chưa kịp xử lý dữ liệu", "Giảm ồn đĩa", "Tăng dung lượng lưu trữ"], correct: 1 },
+        { text: "Khi gặp bad sector, phương pháp 'sector slipping' có nghĩa là:", options: ["Bỏ qua sector hỏng và dùng sector dự phòng, dịch chuyển các sector sau nó", "Định dạng lại toàn bộ đĩa", "Tăng kích thước sector", "Giảm tốc độ đọc"], correct: 0 },
+        { text: "Trong programmed I/O in chuỗi ký tự ra máy in, CPU thực hiện:", options: ["Ghi từng ký tự và chờ (busy-wait) cho đến khi máy in sẵn sàng cho ký tự tiếp theo", "Chỉ khởi tạo DMA", "Ngủ cho đến khi có ngắt", "Sao chép toàn bộ buffer vào bộ nhớ I/O"], correct: 0 },
+        { text: "Trong interrupt-driven I/O, khi in chuỗi ký tự, CPU thường:", options: ["Ghi một ký tự, sau đó ngủ, khi có ngắt lại ghi ký tự tiếp theo", "Dùng DMA để ghi tất cả", "Quay vòng kiểm tra cờ ready", "Không cần lập trình gì"], correct: 0 },
+        { text: "Trong DMA printing, ai chịu trách nhiệm chuyển từng ký tự ra máy in?", options: ["CPU", "Device driver", "DMA controller", "Interrupt handler"], correct: 2 },
+        { text: "Đối với màn hình, kỹ thuật memory-mapped display có nghĩa là:", options: ["Dùng RAM riêng cho màn hình", "Ánh xạ vùng đệm màn hình vào không gian địa chỉ CPU, driver ghi trực tiếp", "Dùng lệnh IN/OUT để điều khiển pixel", "Chỉ dùng chế độ văn bản"], correct: 1 },
+        { text: "BitBlt (Bit Block Transfer) trong GDI Windows dùng để:", options: ["Vẽ hình chữ nhật", "Sao chép vùng bitmap từ nơi này sang nơi khác", "Thay đổi kích thước font chữ", "Quản lý bàn phím"], correct: 1 },
+        { text: "Trong disk scheduling, thuật toán nào có thể gây starvation (đói) cho các yêu cầu ở xa?", options: ["FCFS", "Elevator", "SSF (Shortest Seek First)", "C-SCAN"], correct: 2 },
+        { text: "RAID 0 (striping) cung cấp:", options: ["Dự phòng dữ liệu", "Tăng hiệu suất nhưng không dự phòng", "Nhân đôi dữ liệu", "Parity phân tán"], correct: 1 },
+        { text: "Bàn phím khi nhấn phím sẽ gửi gì đến CPU?", options: ["Mã ASCII", "Mã quét (scan code)", "Ký tự Unicode", "Ngắt NMI"], correct: 1 },
+        { text: "Trong các bus sau, bus nào thường có tốc độ cao nhất?", options: ["ISA", "PCI", "USB 1.1", "Serial port"], correct: 1 },
+        { text: "Thành phần nào chứa các thông số như số cylinder, sector, dung lượng đĩa?", options: ["Boot sector", "Superblock", "Partition table", "Disk controller ROM"], correct: 2 }, // best fit: partition table / drive parameters
+        { text: "Khi sử dụng interrupt-driven I/O, interrupt service routine (ISR) thường:", options: ["Chạy ở user mode", "Chạy ở kernel mode, lưu trạng thái, xử lý thiết bị và báo cho scheduler", "Không được phép truy cập biến toàn cục", "Chỉ đơn giản là khởi động lại hệ thống"], correct: 1 },
+        { text: "Một đĩa cứng có seek time trung bình 6.9 ms, rotational latency 4.17 ms (trung bình), transfer time 0.2 ms. Thành phần nào chiếm thời gian lớn nhất?", options: ["Seek time", "Rotational latency", "Transfer time", "Cả seek và rotational"], correct: 0 },
+        { text: "Kỹ thuật nào cho phép chuyển dữ liệu giữa thiết bị và bộ nhớ mà không cần CPU can thiệp vào từng byte?", options: ["Programmed I/O", "Interrupt-driven I/O", "DMA", "Polling"], correct: 2 },
+        { text: "Trong mô hình I/O software, lớp nào gần với phần cứng nhất?", options: ["User-space I/O software", "Device-independent OS software", "Device driver", "Interrupt handler"], correct: 3 } // interrupt handler is lowest level, but often considered part of driver. For simplicity, device driver is close. Accept either but standard answer: interrupt handler.
+    ];
+    // Adjust last question for clarity: interrupt handler is closest.
+    questions[29] = { text: "Lớp phần mềm I/O nào gần phần cứng nhất, trực tiếp xử lý ngắt?", options: ["Device driver", "Interrupt handler", "Device-independent software", "User-level library"], correct: 1 };
+
+    // Render tất cả câu hỏi
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        questions.forEach((q, idx) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `q-${idx}`;
+
+            const qNumber = idx + 1;
+            const qText = document.createElement('div');
+            qText.className = 'question-text';
+            qText.innerHTML = `${qNumber}. ${q.text}`;
+            card.appendChild(qText);
+
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+
+            q.options.forEach((opt, optIdx) => {
+                const optId = `q${idx}_opt${optIdx}`;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${idx}`;
+                radio.value = optIdx;
+                radio.id = optId;
+
+                const label = document.createElement('label');
+                label.htmlFor = optId;
+                label.textContent = `${String.fromCharCode(65+optIdx)}. ${opt}`;
+
+                optionDiv.appendChild(radio);
+                optionDiv.appendChild(label);
+                optionsDiv.appendChild(optionDiv);
+            });
+            card.appendChild(optionsDiv);
+            container.appendChild(card);
+        });
+    }
+
+    function getUserAnswers() {
+        const answers = [];
+        for (let i = 0; i < questions.length; i++) {
+            const radios = document.querySelectorAll(`input[name="question${i}"]`);
+            let selected = null;
+            for (let r of radios) {
+                if (r.checked) {
+                    selected = parseInt(r.value);
+                    break;
+                }
+            }
+            answers.push(selected);
+        }
+        return answers;
+    }
+
+    function showResults() {
+        const userAnswers = getUserAnswers();
+        let correctCount = 0;
+        const reviewItems = [];
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const userChoice = userAnswers[i];
+            const isCorrect = (userChoice !== null && userChoice === q.correct);
+            if (isCorrect) correctCount++;
+
+            let userLetter = userChoice !== null ? String.fromCharCode(65+userChoice) : "❌ Chưa chọn";
+            let correctLetter = String.fromCharCode(65+q.correct);
+            let correctText = q.options[q.correct];
+            let statusText = isCorrect ? "✅ Đúng" : "❌ Sai";
+
+            reviewItems.push(`
+                <div class="review-item">
+                    <strong>Câu ${i+1}: ${q.text}</strong><br/>
+                    <span class="user-choice">📌 Bạn chọn: ${userLetter} ${userChoice !== null ? q.options[userChoice] : '(chưa chọn)'}</span><br/>
+                    <span class="correct-ans">✔ Đáp án đúng: ${correctLetter}. ${correctText}</span><br/>
+                    <span>${statusText}</span>
+                </div>
+            `);
+        }
+
+        const scorePercent = (correctCount / questions.length * 100).toFixed(1);
+        const resultDiv = document.getElementById('resultArea');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="score">🎯 Điểm số: ${correctCount} / ${questions.length} (${scorePercent}%)</div>
+            <div class="answer-review">
+                <h3>📖 Chi tiết đáp án:</h3>
+                ${reviewItems.join('')}
+            </div>
+            <button id="resetQuizBtn" style="margin-top:16px; background:#2c7da0; border:none; color:white; padding:8px 24px; border-radius:40px; cursor:pointer;">🔄 Làm lại</button>
+        `;
+        const resetBtn = document.getElementById('resetQuizBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const allRadios = document.querySelectorAll('input[type="radio"]');
+                allRadios.forEach(radio => radio.checked = false);
+                resultDiv.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    }
+
+    function onSubmit() {
+        showResults();
+    }
+
+    renderQuestions();
+    document.getElementById('submitBtn').addEventListener('click', onSubmit);
+</script>
+</body>
+</html>
