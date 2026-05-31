@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài Kiểm Tra Ngữ Pháp TOEIC (20 Câu)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .question-block {
+            margin-bottom: 25px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .question-text {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .options label {
+            display: block;
+            margin-bottom: 10px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .options label:hover {
+            background-color: #e9ecef;
+        }
+        input[type="radio"] {
+            margin-right: 10px;
+        }
+        .btn-submit {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn-submit:hover {
+            background-color: #2980b9;
+        }
+        .result-container {
+            display: none;
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e8f8f5;
+            border: 1px solid #1abc9c;
+            border-radius: 5px;
+        }
+        .correct {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .incorrect {
+            color: #c0392b;
+            font-weight: bold;
+        }
+        .explanation {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 5px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Bài Test Ngữ Pháp Căn Bản - Dạng TOEIC ETS</h1>
+    <p style="text-align: center; color: #7f8c8d;">Gồm 20 câu hỏi tập trung vào: Danh từ, Đại từ, Động từ, Tính từ, Trạng từ, Giới từ, Liên từ.</p>
+    
+    <form id="quizForm">
+        <div id="quiz-content"></div>
+        <button type="button" class="btn-submit" onclick="submitQuiz()">Nộp bài & Chấm điểm</button>
+    </form>
+
+    <div id="result" class="result-container">
+        <h2 id="score-text"></h2>
+        <p>Vui lòng cuộn lên trên để xem lại các câu đúng/sai và giải thích chi tiết.</p>
+        <button type="button" style="padding: 10px 20px; margin-top: 10px; cursor: pointer;" onclick="location.reload()">Làm lại bài test</button>
+    </div>
+</div>
+
+<script>
+    const quizData = [
+        // Danh từ
+        { q: "1. The _______ of the new policy will begin next month.", options: ["A. implement", "B. implementation", "C. implemented", "D. implementing"], answer: 1, exp: "Sau mạo từ 'The' và trước giới từ 'of' cần một Danh từ. Chọn implementation (sự thực hiện)." },
+        { q: "2. Customers can find more _______ on our official website.", options: ["A. inform", "B. informative", "C. information", "D. informally"], answer: 2, exp: "Sau tính từ/lượng từ 'more' cần một Danh từ đóng vai trò tân ngữ. Chọn information (thông tin)." },
+        { q: "3. The factory plans to increase its _______ by 20% next year.", options: ["A. produce", "B. product", "C. productive", "D. production"], answer: 3, exp: "Sau tính từ sở hữu 'its' cần một Danh từ. Chọn production (sự sản xuất/sản lượng)." },
+        
+        // Đại từ
+        { q: "4. All employees must submit _______ travel expenses by Friday.", options: ["A. they", "B. them", "C. their", "D. theirs"], answer: 2, exp: "Trước cụm danh từ 'travel expenses' cần một Tính từ sở hữu. Chọn their (của họ)." },
+        { q: "5. Mr. Lee fixed the computer system by _______.", options: ["A. he", "B. him", "C. his", "D. himself"], answer: 3, exp: "Cấu trúc 'by + đại từ phản thân' nghĩa là tự ai đó làm gì. Chọn himself (tự anh ấy)." },
+        
+        // Động từ
+        { q: "6. The marketing team _______ a new advertising campaign last week.", options: ["A. launch", "B. launches", "C. launched", "D. will launch"], answer: 2, exp: "Dấu hiệu 'last week' chỉ quá khứ đơn. Chọn launched." },
+        { q: "7. The report _______ by the committee before the meeting yesterday.", options: ["A. reviewed", "B. was reviewed", "C. reviewing", "D. reviews"], answer: 1, exp: "Chủ ngữ 'The report' (bản báo cáo) không tự hành động được, cần câu bị động quá khứ. Chọn was reviewed." },
+        { q: "8. Ms. Smith has _______ working at this company since 2010.", options: ["A. be", "B. being", "C. been", "D. is"], answer: 2, exp: "Thì hiện tại hoàn thành tiếp diễn: has been + V-ing. Chọn been." },
+
+        // Tính từ
+        { q: "9. The instructions in the manual are very _______ to understand.", options: ["A. easy", "B. easily", "C. ease", "D. easier"], answer: 0, exp: "Sau to be 'are' và trạng từ chỉ mức độ 'very' cần một Tính từ. Chọn easy." },
+        { q: "10. The manager is _______ for the success of the project.", options: ["A. response", "B. responsibly", "C. responsible", "D. responsibility"], answer: 2, exp: "Cấu trúc: to be responsible for (chịu trách nhiệm về...). Chọn tính từ responsible." },
+        { q: "11. The company offers a highly _______ salary for this position.", options: ["A. competitor", "B. compete", "C. competitive", "D. competitively"], answer: 2, exp: "Vị trí nằm giữa Trạng từ 'highly' và Danh từ 'salary', cần một Tính từ. Chọn competitive (cạnh tranh)." },
+
+        // Trạng từ
+        { q: "12. The software updates _______ every month to fix bugs.", options: ["A. automatic", "B. automatically", "C. automate", "D. automation"], answer: 1, exp: "Cần một Trạng từ để bổ nghĩa cho động từ 'updates' phía trước. Chọn automatically (một cách tự động)." },
+        { q: "13. Please read the contract _______ before signing it.", options: ["A. careful", "B. care", "C. carefully", "D. careless"], answer: 2, exp: "Cần một Trạng từ bổ nghĩa cho động từ 'read' (đọc như thế nào). Chọn carefully (một cách cẩn thận)." },
+        { q: "14. He was _______ surprised by the survey results.", options: ["A. complete", "B. completely", "C. completion", "D. completed"], answer: 1, exp: "Đứng giữa to be 'was' và tính từ 'surprised', cần một Trạng từ bổ nghĩa mức độ. Chọn completely." },
+
+        // Giới từ
+        { q: "15. The annual seminar will take place _______ Monday morning.", options: ["A. in", "B. on", "C. at", "D. for"], answer: 1, exp: "Chỉ một buổi của một ngày cụ thể trong tuần, ta dùng giới từ 'on'." },
+        { q: "16. The corporate headquarters is located _______ Tokyo.", options: ["A. in", "B. on", "C. at", "D. with"], answer: 0, exp: "Với tên thành phố/quốc gia, dùng giới từ 'in'." },
+        { q: "17. We have been waiting for the manager _______ three hours.", options: ["A. since", "B. in", "C. for", "D. at"], answer: 2, exp: "Dùng 'for' + một khoảng thời gian (three hours)." },
+
+        // Liên từ
+        { q: "18. _______ it was raining heavily, the outdoor event was not canceled.", options: ["A. Because", "B. Although", "C. Despite", "D. But"], answer: 1, exp: "Theo sau là một mệnh đề (S+V) và mang nghĩa nhượng bộ (Mặc dù). Chọn Although." },
+        { q: "19. You can pay by credit card _______ by bank transfer.", options: ["A. and", "B. but", "C. or", "D. so"], answer: 2, exp: "Chỉ sự lựa chọn giữa 2 phương thức. Chọn or (hoặc)." },
+        { q: "20. We will start the meeting _______ the CEO arrives.", options: ["A. when", "B. during", "C. because of", "D. despite"], answer: 0, exp: "Theo sau là mệnh đề (S+V) chỉ thời gian. 'during', 'because of', 'despite' chỉ cộng với Noun/V-ing. Chọn when." }
+    ];
+
+    const quizContainer = document.getElementById('quiz-content');
+
+    // Hiển thị câu hỏi
+    function loadQuiz() {
+        quizData.forEach((item, index) => {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'question-block';
+            questionDiv.id = `q-block-${index}`;
+
+            const questionTitle = document.createElement('div');
+            questionTitle.className = 'question-text';
+            questionTitle.innerText = item.q;
+            questionDiv.appendChild(questionTitle);
+
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'options';
+
+            item.options.forEach((opt, optIndex) => {
+                const label = document.createElement('label');
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question${index}`;
+                radio.value = optIndex;
+                
+                label.appendChild(radio);
+                label.appendChild(document.createTextNode(opt));
+                optionsDiv.appendChild(label);
+            });
+
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.id = `feedback-${index}`;
+            feedbackDiv.style.marginTop = '10px';
+            
+            questionDiv.appendChild(optionsDiv);
+            questionDiv.appendChild(feedbackDiv);
+            quizContainer.appendChild(questionDiv);
+        });
+    }
+
+    // Chấm điểm
+    function submitQuiz() {
+        let score = 0;
+        
+        quizData.forEach((item, index) => {
+            const selectedOption = document.querySelector(`input[name="question${index}"]:checked`);
+            const feedbackDiv = document.getElementById(`feedback-${index}`);
+            const qBlock = document.getElementById(`q-block-${index}`);
+            
+            // Disable radio buttons sau khi submit
+            const allRadios = document.querySelectorAll(`input[name="question${index}"]`);
+            allRadios.forEach(radio => radio.disabled = true);
+
+            if (selectedOption) {
+                const userAnswer = parseInt(selectedOption.value);
+                if (userAnswer === item.answer) {
+                    score++;
+                    qBlock.style.borderColor = '#27ae60';
+                    feedbackDiv.innerHTML = `<span class="correct">✔ Chính xác!</span> <div class="explanation">Giải thích: ${item.exp}</div>`;
+                } else {
+                    qBlock.style.borderColor = '#c0392b';
+                    const correctText = item.options[item.answer];
+                    feedbackDiv.innerHTML = `<span class="incorrect">✘ Sai! Đáp án đúng là: ${correctText}</span> <div class="explanation">Giải thích: ${item.exp}</div>`;
+                }
+            } else {
+                qBlock.style.borderColor = '#f39c12';
+                const correctText = item.options[item.answer];
+                feedbackDiv.innerHTML = `<span class="incorrect">⚠ Bạn chưa trả lời câu này! Đáp án đúng là: ${correctText}</span> <div class="explanation">Giải thích: ${item.exp}</div>`;
+            }
+        });
+
+        // Ẩn nút nộp bài và hiện kết quả
+        document.querySelector('.btn-submit').style.display = 'none';
+        const resultDiv = document.getElementById('result');
+        const scoreText = document.getElementById('score-text');
+        
+        resultDiv.style.display = 'block';
+        let percentage = (score / quizData.length) * 100;
+        scoreText.innerText = `Bạn đã trả lời đúng ${score} / ${quizData.length} câu (${percentage}%)`;
+        
+        // Cuộn xuống kết quả
+        resultDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Khởi tạo bài test
+    window.onload = loadQuiz;
+</script>
+
+</body>
+</html>
