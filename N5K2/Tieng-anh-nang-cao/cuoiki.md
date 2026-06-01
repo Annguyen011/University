@@ -78,3 +78,15 @@ Nội động từ; Đứng 1 mình vẫn đầy đủ ý nghĩa
 Ngoại động từ: Phải kèm theo tân ngữ để đầy đủ ý nghĩa bổ sung nghĩa cho động từ
 **Ví dụ**: I can't find my key
             I sleep
+
+- C: Bổ ngữ là thành phần đứng sau động từ và thêm thông tin cho chủ ngữ hoặc tân ngữ, đặc biệt là trong mệnh đề sử dụng động từ be(am, is, are)
+**Ví dụ**: Jack is a doctor => doctor bổ nghĩa cho Jack
+All of them semmed suprised => surprised bổ nghĩa cho tất cả mọi người
+
+- A(adjunct): Sung ngữ là từ hoặc cụm từ đóng vai trò thêm thông tin cho mệnh đề. Sung ngữ là thành phần không bắt buộc trong mệnh đề.
+**Ví dụ:** 
+> She quickly realised her mistake
+  They waited outside for ages
+
+Phân biệt bổ ngữ và sung ngữ
+![alt text](image-1.png)
