@@ -90,3 +90,28 @@ All of them semmed suprised => surprised bổ nghĩa cho tất cả mọi ngư�
 
 Phân biệt bổ ngữ và sung ngữ
 ![alt text](image-1.png)
+- Mệnh đề mệnh lệnh:
+**Lưu ý 1:** Có cả khang định và phủ định
+**Lưu ý 2:** Dùng Do not thay vì don't trong ngữ cảnh trang trọng
+**Lưu ý 3:** Let's: Câu rủ câu gọi ý
+- Mệnh đề cảm thán
+What + a/an + adj + N + S + V
+How + adj/adv + S + V
+
+- Mệnh đề chính: Là tự nó là câu hoàn chỉnh, luôn được chia thì
+- Mệnh đề phụ: là bản thân nó không phải câu hoàn chỉnh, có thể chia thì hoặc không
+**Ví dụ**: I didn't go to work because I wasn't feeling very well
+
+### 2.2 Câu 
+Là một đơn vị ngữ pháp, được tạo nên bới một hoặc nhiều mệnh đề trong đó ít nhất một mệnh đề chính
+
+Có 3 loại câu cơ bản
+- Câu đơn: Có 1 mệnh đề là mệnh đề chính
+- Câu ghép: là 2 mệnh đề chính với nhau với các liên từ
+- Câu phức: 1 mệnh đề chính và  hoặc nhiều hơn mệnh đề phụ thuộc(liên từ phụ thuộc: because, if, after, although)
+**Ví dụ:** I got up earlier than usual because I had to get the 6:30 
+
+## Bài 3: Danh từ
+## 3.1 Danh từ đếm được
+- Chia làm 2 dạng là số ít và số nhiều
+**Ví dụ:** She's got two sisters and a brother
