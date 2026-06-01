@@ -112,7 +112,17 @@ Có 3 loại câu cơ bản
 **Ví dụ:** I got up earlier than usual because I had to get the 6:30 
 
 ## Bài 3: Danh từ
-## 3.1 Danh từ đếm được
+### 3.1 Danh từ đếm được
 - Chia làm 2 dạng là số ít và số nhiều
 **Ví dụ:** She's got two sisters and a brother
 => Ta thường dùng cụm a pair of hoặc pairs of để nói về số lượng của những vật
+
+### 3.2 Từ hạn định
+Đứng trước danh từ và giới hạn số lượng của danh từ đó
+trong danh từ thì từ hạn định + tính từ + danh từ
+
+### 3.3 Mạo từ
+an đứng trước âm đầu là nguyên âm
+a đứng trước âm đầu là phụ âm
+the dùng để nhắc lại danh từ đã nhắc đến từ trước, mạo từ đã được xác định
+**Ví dụ:** Can you turn off the light, please?
