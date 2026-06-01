@@ -115,3 +115,4 @@ Có 3 loại câu cơ bản
 ## 3.1 Danh từ đếm được
 - Chia làm 2 dạng là số ít và số nhiều
 **Ví dụ:** She's got two sisters and a brother
+=> Ta thường dùng cụm a pair of hoặc pairs of để nói về số lượng của những vật
