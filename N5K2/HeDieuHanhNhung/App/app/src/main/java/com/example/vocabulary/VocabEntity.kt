@@ -13,7 +13,9 @@ data class VocabEntity(
     val studyCount: Int = 0,
     val customSentence: String = "",
     val itemType: String = "vocab",
-    val isMastered: Boolean = false
+    val isMastered: Boolean = false,
+    val phonetic: String = "",
+    val imageUrl: String = ""
 )
 
 @Entity(tableName = "phrase")
@@ -26,7 +28,9 @@ data class PhraseEntity(
     val studyCount: Int = 0,
     val customSentence: String = "",
     val itemType: String = "phrase",
-    val isMastered: Boolean = false
+    val isMastered: Boolean = false,
+    val phonetic: String = "",
+    val imageUrl: String = ""
 )
 
 @Entity(tableName = "grammar")
@@ -39,5 +43,7 @@ data class GrammarEntity(
     val studyCount: Int = 0,
     val customSentence: String = "",
     val itemType: String = "grammar",
-    val isMastered: Boolean = false
+    val isMastered: Boolean = false,
+    val phonetic: String = "",
+    val imageUrl: String = ""
 )

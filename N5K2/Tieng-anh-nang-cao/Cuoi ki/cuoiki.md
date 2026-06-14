@@ -401,3 +401,94 @@ Hành động đã kết thức tại một thời điểm xác định trong qu
 
 ### 6.7 Quá khứ hoàn thành
 ![alt text](image-14.png)
+![alt text](image-15.png)
+
+### 6.8 Quá khứ hoàn thành tiếp diễn
+![alt text](image-16.png)
+![alt text](image-17.png)
+![alt text](image-18.png)
+### 6.9 Tương lai đơn
+![alt text](image-19.png)
+![alt text](image-20.png)
+
+### 6.10 Tương lai gần
+![alt text](image-21.png)
+![alt text](image-22.png)
+### 6.11 Tương lai tiếp diễn
+![alt text](image-23.png)
+![alt text](image-24.png)
+
+### 6.12 Tương lai hoàn thành và tương lai hoàn thành tiếp diễn
+![alt text](image-25.png)
+![alt text](image-26.png)
+
+### 6.13 Tóm tắt tất cả các thì
+![alt text](image-27.png)
+
+## Bài 7: Thể bị động
+### 7.1 Khái niệm
+Thể bị động được dùng khi chủ ngữ là đối tượng chịu tác động của hành động, thay vì thực hiện hành động đó
+> Cấu trúc chung: be + V3/ed(VPII)
+  Trong đó: 
+  Be chia theo thì, chủ ngữ và cấu trúc câu
+  VPII quá khứ phân từ luôn giữ nguyên
+
+> So sánh chủ động và bị động
+  Chủ động: My father designed these houses in 2000
+  Bị động: These house were designed in 2000 by my father
+
+### 7.2 Cách chia thể bị động theo thì
+> Các thì hiện tại và quá khứ
+  ![alt text](image-28.png)
+
+> Các thì tương lai và động từ khuyết thiếu
+  ![alt text](image-29.png)
+
+### 7.3 Một số cấu trúc bị động đặc biệt
+> Bị động với V-ing( dùng sau một số động từ như like, hate, remember, without,...)
+  ![alt text](image-30.png)
+
+> Bị động với get
+  ![alt text](image-31.png)
+
+> Cấu trúc have something done/ get something done
+  ![alt text](image-32.png)
+
+> Cấu trúc tường thuật
+  ![alt text](image-33.png)
+
+### 7.4 Các lưu ý quan trọng
+> Tác nhân(by + agent) - có thể bỏ qua
+  ![alt text](image-34.png)
+
+> Dùng giới từ khác thay by khi nói về công cụ, nguyên liệu
+  ![alt text](image-35.png)
+
+> Câu chủ động có 2 tân ngữ - 2 cách chuyển bị động
+  ![alt text](image-36.png)
+
+### 7.4 Tóm tắt
+![alt text](image-37.png)
+
+## Bài 8: Động từ nguyên mẫu và động từ khởi phát
+### 8.1 Động từ nguyên mẫu
+Là động từ không thay đổi và ở dạng nguyên thể
+### 8.2 Các trường hợp dùng động từ nguyên mẫu
+> Sau động từ khiếm khuyết
+  Can/could/may/might/will/shall/would/should/ought to/ must + V-inf
+  ![alt text](image-38.png)
+
+> Sau động từ khởi phát
+  Let + O + V-inf
+  make + O + V-inf
+  have + O + V-inf
+  help + O + (to) + V-inf
+
+> Động từ tri giác + O + V-inf
+  Các động từ tri giác: see, hear, feel, watch, notice + O + V-inf
+  Ví dụ: We saw her get off the bus
+  ![alt text](image-39.png)
+
+### 8.3 Tóm tắt
+![alt text](image-40.png)
+
